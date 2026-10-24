@@ -26,7 +26,7 @@ fun speedCorrectionPreference(config: AppConfig) {
     }
     AnimatedVisibility(enabled) {
         Column {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(enabled = percent > -20, onClick = { percent--; config.speedCorrectionPercent = percent }) {
                     Icon(Icons.Default.Remove, stringResource(R.string.speed_correction_decrease))
                 }
