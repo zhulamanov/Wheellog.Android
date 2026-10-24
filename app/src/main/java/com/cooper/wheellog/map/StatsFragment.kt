@@ -59,21 +59,27 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
             setDrawGridBackground(false)
             description.isEnabled = false
             setHardwareAccelerationEnabled(true)
-            legend.textColor = getColorEx(android.R.color.white)
+            setBackgroundColor(context.statsBackgroundColor())
+            legend.textColor = context.statsTextColor()
+            legend.textSize = 12f
+            legend.isWordWrapEnabled = true
             setNoDataText(resources.getString(R.string.no_chart_data))
-            setNoDataTextColor(getColorEx(android.R.color.white))
+            setNoDataTextColor(context.statsTextColor())
             axisLeft.apply {
                 setDrawGridLines(false)
-                textColor = chart.getColorEx(android.R.color.white)
+                textColor = chart.context.statsTextColor()
+                textSize = 12f
                 axisMinimum = 0f
             }
             axisRight.apply {
                 setDrawGridLines(false)
-                textColor = chart.getColorEx(android.R.color.white)
+                textColor = chart.context.statsTextColor()
+                textSize = 12f
             }
             xAxis.apply {
                 position = XAxis.XAxisPosition.BOTTOM
-                textColor = chart.getColorEx(android.R.color.white)
+                textColor = chart.context.statsTextColor()
+                textSize = 12f
                 valueFormatter = chartAxisValueFormatter
             }
         }
@@ -86,7 +92,7 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
                     addDataSet(it)
                 }
             }
-            marker = ChartMarkerView(requireContext(), chart.xAxis.valueFormatter, stats)
+            marker = ChartMarkerView(requireContext(), chart.xAxis.valueFormatter, stats).apply { chartView = chart }
             invalidate()
         }
     }

@@ -37,6 +37,7 @@ class MapActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(com.cooper.wheellog.utils.ThemeManager.theme)
         super.onCreate(savedInstanceState)
         val context = applicationContext
 
@@ -126,7 +127,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.batteryLevel.toFloat()) },
                 getString(R.string.battery)
             ).apply {
-                color = getColorEx(R.color.stats_battery)
+                color = statSeriesColor(R.color.stats_battery)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.LEFT
                 lineWidth = 2f
@@ -135,7 +136,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.speed.toFloat()) },
                 getString(R.string.speed)
             ).apply {
-                color = getColorEx(R.color.stats_speed)
+                color = statSeriesColor(R.color.stats_speed)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.LEFT
                 lineWidth = 2f
@@ -144,7 +145,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.temperature.toFloat()) },
                 getString(R.string.temperature)
             ).apply {
-                color = getColorEx(R.color.stats_temp)
+                color = statSeriesColor(R.color.stats_temp)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.RIGHT
                 lineWidth = 2f
@@ -154,7 +155,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.pwm.toFloat()) },
                 getString(R.string.pwm)
             ).apply {
-                color = getColorEx(R.color.stats_pwm)
+                color = statSeriesColor(R.color.stats_pwm)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.LEFT
                 lineWidth = 2f
@@ -163,7 +164,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.voltage.toFloat()) },
                 getString(R.string.voltage)
             ).apply {
-                color = getColorEx(R.color.stats_voltage)
+                color = statSeriesColor(R.color.stats_voltage)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.LEFT
                 lineWidth = 2f
@@ -172,7 +173,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.power.toFloat()) },
                 getString(R.string.power)
             ).apply {
-                color = getColorEx(R.color.stats_power)
+                color = statSeriesColor(R.color.stats_power)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.RIGHT
                 lineWidth = 2f
@@ -181,7 +182,7 @@ class MapActivity : AppCompatActivity() {
                 list.map { Entry(it.timePlusDayOfWeek, it.current.toFloat()) },
                 getString(R.string.current)
             ).apply {
-                color = getColorEx(R.color.stats_current)
+                color = statSeriesColor(R.color.stats_current)
                 setDrawCircles(false)
                 axisDependency = YAxis.AxisDependency.LEFT
                 lineWidth = 2f
