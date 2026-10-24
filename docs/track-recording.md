@@ -29,3 +29,23 @@ Graph, Trips and Events; disabled pages remain hidden. Additional dashboard orde
 Tests cover CSV parsing, GPS/wheel association, pause and recovery, playback,
 export, route segments, thumbnail behavior and day/night theme surfaces.
 Physical-device BLE/GPS and background-service verification is still required.
+
+## Trip cards and Values
+
+Thumbnails are square with rounded corners. Eight existing card metrics use a new
+layout beside the preview: two columns with large icons spanning value and unit
+rows. Values are left aligned; captions begin below the first digit. The metric grid
+is constrained to the same height as the thumbnail. Original hamburger menus and the
+absence of a Trips page heading are retained.
+
+Values contains GPS maximum, time-weighted average and moving average speed; wheel
+maximum speed; maximum PWM, power, current and phase current; minimum voltage;
+moving time; distance in kilometres; and maximum board and motor temperatures.
+GPS averages use available GPS samples and skip recording gaps and segment boundaries.
+Missing optional telemetry is shown as an em dash; a recorded zero remains zero.
+Speeds are presented in km/h and temperatures in Celsius on this summary screen.
+
+With same-day continuation enabled, morning Stop closes the morning session. Lunch
+Start opens a new CSV. After a normal exit, an evening Start for the same wheel
+continues the lunch CSV until Stop is pressed again. NativeTrackRecordingTest covers
+this complete sequence without modifying the finished morning file.

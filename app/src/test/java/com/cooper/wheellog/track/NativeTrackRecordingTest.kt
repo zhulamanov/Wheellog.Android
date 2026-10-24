@@ -208,14 +208,26 @@ class NativeTrackRecordingTest {
         assertTrue(provider.files.values.single().first.readBytes().take(original.size).toByteArray().contentEquals(original))
     }
 
-    @Test fun `explicit stop still starts a new trip even when day continuation is enabled`() {
+    @Test fun `morning Stop creates a lunch trip and evening continues lunch until the next Stop`() {
         config.continueThisDayLog = true
         val service = start(); fix(service)
-        val first = LoggingService.currentLogFileName
+        val morning = LoggingService.currentLogFileName
+        val originalMorning = provider.files.values.first().first.readBytes()
         command(service, LoggingService.STOP)
         ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); command(service, LoggingService.START)
-        assertNotEquals(first, LoggingService.currentLogFileName)
+        val lunch = LoggingService.currentLogFileName
+        assertNotEquals(morning, lunch)
+        fix(service, .0001)
+        command(service, LoggingService.EXIT)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(60)); command(service, LoggingService.START)
+        fix(service, .0003)
+        assertEquals(lunch, LoggingService.currentLogFileName)
         assertEquals(2, provider.files.size)
+        assertArrayEquals(originalMorning, provider.files.values.first().first.readBytes())
+        command(service, LoggingService.STOP)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); command(service, LoggingService.START)
+        assertNotEquals(lunch, LoggingService.currentLogFileName)
+        assertEquals(3, provider.files.size)
     }
 
     @Test fun `yesterday another wheel disabled option or deleted file never append to the prior day trip`() {
