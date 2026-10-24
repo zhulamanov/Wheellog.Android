@@ -120,32 +120,32 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
 
     private val viewBlockInfo: Array<ViewBlockInfo>
         get() = arrayOf(
-                ViewBlockInfo(resources.getString(R.string.pwm)) { String.format(Locale.US, "%.2f%%", mPwm) },
-                ViewBlockInfo(resources.getString(R.string.max_pwm)) { String.format(Locale.US, "%.2f%%", mMaxPwm) },
-                ViewBlockInfo(resources.getString(R.string.voltage)) { String.format(Locale.US, "%.2f " + resources.getString(R.string.volt), mVoltage) },
-                ViewBlockInfo(resources.getString(R.string.average_riding_speed)) {
+                ViewBlockInfo("pwm", resources.getString(R.string.pwm)) { String.format(Locale.US, "%.2f%%", mPwm) },
+                ViewBlockInfo("max_pwm", resources.getString(R.string.max_pwm)) { String.format(Locale.US, "%.2f%%", mMaxPwm) },
+                ViewBlockInfo("voltage", resources.getString(R.string.voltage)) { String.format(Locale.US, "%.2f " + resources.getString(R.string.volt), mVoltage) },
+                ViewBlockInfo("average_riding_speed", resources.getString(R.string.average_riding_speed)) {
                     if (useMph) {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.mph), kmToMiles(mAverageSpeed))
                     } else {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.kmh), mAverageSpeed)
                     }
                 },
-                ViewBlockInfo(resources.getString(R.string.riding_time)) { mCurrentTime },
-                ViewBlockInfo(resources.getString(R.string.speed)) {
+                ViewBlockInfo("riding_time", resources.getString(R.string.riding_time)) { mCurrentTime },
+                ViewBlockInfo("speed", resources.getString(R.string.speed)) {
                     if (useMph) {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.mph), kmToMiles(mSpeed.toFloat() / 10))
                     } else {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.kmh), mSpeed.toFloat() / 10)
                     }
                 },
-                ViewBlockInfo(resources.getString(R.string.top_speed)) {
+                ViewBlockInfo("top_speed", resources.getString(R.string.top_speed)) {
                     if (useMph) {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.mph), kmToMiles(mTopSpeed))
                     } else {
                         String.format(Locale.US, "%.1f " + resources.getString(R.string.kmh), mTopSpeed)
                     }
                 },
-                ViewBlockInfo(resources.getString(R.string.distance)) {
+                ViewBlockInfo("distance", resources.getString(R.string.distance)) {
                     if (useMph) {
                         String.format(Locale.US, "%.2f " + resources.getString(R.string.miles), kmToMiles(mDistance))
                     } else {
@@ -156,20 +156,20 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                         }
                     }
                 },
-                ViewBlockInfo(resources.getString(R.string.total)) {
+                ViewBlockInfo("total", resources.getString(R.string.total)) {
                     if (useMph) {
                         String.format(Locale.US, "%.0f " + resources.getString(R.string.miles), kmToMiles(mTotalDistance))
                     } else {
                         String.format(Locale.US, "%.0f " + resources.getString(R.string.km), mTotalDistance)
                     }
                 },
-                ViewBlockInfo(resources.getString(R.string.battery)) { String.format(Locale.US, "%d %%", mBattery) },
-                ViewBlockInfo(resources.getString(R.string.current)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), mCurrent) },
-                ViewBlockInfo(resources.getString(R.string.phase_current)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), mPhaseCurrent) },
-                ViewBlockInfo(resources.getString(R.string.maxcurrent)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), WheelData.getInstance().maxCurrentDouble) },
-                ViewBlockInfo(resources.getString(R.string.maxphasecurrent)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), WheelData.getInstance().maxPhaseCurrentDouble) },
+                ViewBlockInfo("battery", resources.getString(R.string.battery)) { String.format(Locale.US, "%d %%", mBattery) },
+                ViewBlockInfo("current", resources.getString(R.string.current)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), mCurrent) },
+                ViewBlockInfo("phase_current", resources.getString(R.string.phase_current)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), mPhaseCurrent) },
+                ViewBlockInfo("maxcurrent", resources.getString(R.string.maxcurrent)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), WheelData.getInstance().maxCurrentDouble) },
+                ViewBlockInfo("maxphasecurrent", resources.getString(R.string.maxphasecurrent)) { String.format(Locale.US, "%.1f " + resources.getString(R.string.amp), WheelData.getInstance().maxPhaseCurrentDouble) },
                 ViewBlockInfo(
-                    resources.getString(R.string.power),
+                    "power", resources.getString(R.string.power),
                     {
                         String.format(
                             Locale.US,
@@ -180,7 +180,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.maxpower),
+                    "maxpower", resources.getString(R.string.maxpower),
                     {
                         String.format(
                             Locale.US,
@@ -190,17 +190,17 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     },
                     false
                 ),
-                ViewBlockInfo(resources.getString(R.string.temperature), {
+                ViewBlockInfo("temperature", resources.getString(R.string.temperature), {
                     mTemperature.toTempString()
                 },
                 false),
-                ViewBlockInfo(resources.getString(R.string.temperature2), {
+                ViewBlockInfo("temperature2", resources.getString(R.string.temperature2), {
                     WheelData.getInstance().temperature2.toTempString()
                 }, false),
-                ViewBlockInfo(resources.getString(R.string.maxtemperature), {
+                ViewBlockInfo("maxtemperature", resources.getString(R.string.maxtemperature), {
                     mMaxTemperature.toTempString()
                 }, false),
-                ViewBlockInfo(resources.getString(R.string.average_speed), {
+                ViewBlockInfo("average_speed", resources.getString(R.string.average_speed), {
                         if (useMph) {
                             String.format(
                                 Locale.US,
@@ -218,12 +218,12 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.ride_time),
+                    "ride_time", resources.getString(R.string.ride_time),
                     { WheelData.getInstance().rideTimeString },
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.wheel_distance),
+                    "wheel_distance", resources.getString(R.string.wheel_distance),
                     {
                         if (useMph) {
                             String.format(
@@ -242,7 +242,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.remaining_distance),
+                    "remaining_distance", resources.getString(R.string.remaining_distance),
                     {
                         if (useMph) {
                             String.format(
@@ -261,21 +261,21 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.battery_per_km),
+                    "battery_per_km", resources.getString(R.string.battery_per_km),
                     {
                         String.format(Locale.US, "%.2f %%", WheelData.getInstance().batteryPerKm)
                     },
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.avg_cell_volt),
+                    "avg_cell_volt", resources.getString(R.string.avg_cell_volt),
                     {
                         String.format(Locale.US, "%.2f " + resources.getString(R.string.volt), WheelData.getInstance().avgVoltagePerCell)
                     },
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.user_distance),
+                    "user_distance", resources.getString(R.string.user_distance),
                     {
                         String.format(
                             Locale.US,
@@ -285,7 +285,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     false
                 ),
                 ViewBlockInfo(
-                    resources.getString(R.string.consumption),
+                    "consumption", resources.getString(R.string.consumption),
                     {
                         if (appConfig.useMph) {
                             String.format(
@@ -317,9 +317,9 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
             block.index = -1
         }
         var index = 0
-        for (title in appConfig.viewBlocks) {
+        for (key in appConfig.viewBlockIds) {
             for (block in mViewBlocks) {
-                if (block.title == title) {
+                if (block.key == key) {
                     block.index = index++
                     block.enabled = true
                     break
@@ -1188,8 +1188,10 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                     return
                 }
                 Alarms.vibrate(context, longArrayOf(0, 50, 50))
-                val currentTitle = mViewBlocks.filter { it.enabled }[i].title
-                val items = mViewBlocks.filter { !it.enabled }.map { block -> block.title }
+                val current = mViewBlocks.filter { it.enabled }[i]
+                val currentTitle = current.title
+                val replacements = mViewBlocks.filter { !it.enabled }
+                val items = replacements.map { block -> block.title }
                 AlertDialog.Builder(context)
                     .setIcon(R.drawable.ic_baseline_dashboard_customize_24)
                     .setTitle(
@@ -1199,10 +1201,12 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                         )
                     )
                     .setItems(items.toTypedArray()) { _, which ->
-                        val title = items[which]
-                        val newBlocks = appConfig.viewBlocks
-                        newBlocks[newBlocks.indexOf(currentTitle)] = title
-                        appConfig.viewBlocks = newBlocks
+                        val newBlocks = appConfig.viewBlockIds.toMutableList()
+                        val index = newBlocks.indexOf(current.key)
+                        if (index < 0) return@setItems
+                        newBlocks[index] = replacements[which].key
+                        appConfig.viewBlockIds = newBlocks
+                        appConfig.viewBlockOrder = newBlocks + appConfig.viewBlockOrder
                         updateViewBlocksVisibility()
                         redrawTextBoxes()
                     }

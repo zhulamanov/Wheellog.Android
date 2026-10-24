@@ -95,4 +95,34 @@ class WheelViewPaletteTest {
             stopKoin()
         }
     }
+    @Test fun `dashboard keeps selection when activity language differs from application preferences`() {
+        val base = ApplicationProvider.getApplicationContext<Context>()
+        fun localized(language: String) = base.createConfigurationContext(android.content.res.Configuration(base.resources.configuration).apply {
+            setLocale(java.util.Locale.forLanguageTag(language))
+        })
+        val config = AppConfig(localized("ru"))
+        val previous = config.viewBlockIds
+        val selected = listOf("voltage", "temperature2", "pwm", "distance")
+        config.viewBlockIds = selected
+        startKoin { modules(module { single { config } }) }
+        try {
+            ThemeManager.theme = R.style.OriginalTheme
+            for (language in listOf("en", "ru", "en")) {
+                val context = ContextThemeWrapper(localized(language), R.style.OriginalTheme)
+                val view = WheelView(context, null)
+                view.updateViewBlocksVisibility()
+                val field = WheelView::class.java.getDeclaredField("mViewBlocks").apply { isAccessible = true }
+                val blocks = (field.get(view) as Array<*>).filterIsInstance<com.cooper.wheellog.views.ViewBlockInfo>()
+                    .filter { it.enabled }.sortedBy { it.index }
+                assertEquals(selected, blocks.map { it.key })
+                assertEquals(context.getString(R.string.voltage), blocks.first().title)
+                assertEquals(selected, config.viewBlockIds)
+            }
+        } finally {
+            config.viewBlockIds = previous
+            ThemeManager.theme = R.style.OriginalTheme
+            stopKoin()
+        }
+    }
+
 }

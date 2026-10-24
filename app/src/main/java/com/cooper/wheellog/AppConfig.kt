@@ -94,18 +94,36 @@ class AppConfig(var context: Context): KoinComponent {
         get() = getValue(R.string.view_blocks_string, null)
         set(value) = setValue(R.string.view_blocks_string, value)
 
-   var viewBlocks: Array<String>
-        get() = this.viewBlocksString?.split(separator)?.toTypedArray()
-            ?: arrayOf(
-                context.getString(R.string.pwm),
-                context.getString(R.string.max_pwm),
-                context.getString(R.string.voltage),
-                context.getString(R.string.average_riding_speed),
-                context.getString(R.string.riding_time),
-                context.getString(R.string.top_speed),
-                context.getString(R.string.distance),
-                context.getString(R.string.total))
-        set(value) { this.viewBlocksString = value.joinToString(separator) }
+    private val infoBlocks by lazy { InfoBlocks(context) }
+    val infoBlockPresets by lazy { InfoBlockPresets(sharedPreferences, infoBlocks) }
+
+    var viewBlockIds: List<String>
+        get() {
+            val saved = viewBlocksString ?: return infoBlocks.defaults
+            val ids = infoBlocks.normalize(saved.split(separator))
+            val normalized = ids.joinToString(separator)
+            if (normalized != saved) viewBlocksString = normalized
+            return ids.filter { it in infoBlocks.titles }
+        }
+        set(value) { viewBlocksString = infoBlocks.normalize(value).joinToString(separator) }
+
+    var viewBlockOrder: List<String>
+        get() = infoBlocks.order(getValue("view_blocks_order", "").split(separator), viewBlockIds)
+        set(value) {
+            val order = infoBlocks.order(value, viewBlockIds)
+            setValue("view_blocks_order", order.joinToString(separator))
+            val selected = viewBlockIds.toSet()
+            viewBlockIds = order.filter { it in selected }
+        }
+
+    // The existing drawing and long-press replacement code consumes display titles.
+    // Only the persistence layer converts them to stable IDs and back.
+    var viewBlocks: Array<String>
+        get() = viewBlockIds.map { context.getString(infoBlocks.titles.getValue(it)) }.toTypedArray()
+        set(value) {
+            viewBlockIds = value.toList()
+            viewBlockOrder = viewBlockIds + viewBlockOrder
+        }
 
     var usePipMode: Boolean
         get() = getValue(R.string.use_pip_mode, false)

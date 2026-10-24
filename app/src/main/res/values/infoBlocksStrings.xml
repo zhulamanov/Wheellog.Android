@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="info_blocks_order_description">Select the blocks to show below the speedometer. Use the arrows to change their order.</string>
+    <string name="info_presets_selection">Presets: %1$s</string>
+    <string name="info_presets_choose">choose or save</string>
+    <string name="info_presets_save_new">Save as new preset (%1$d/%2$d)</string>
+    <string name="info_presets_new">New block preset</string>
+    <string name="info_presets_name">Preset name</string>
+    <string name="info_presets_update">Update saved blocks and order</string>
+    <string name="info_presets_rename">Rename preset</string>
+    <string name="info_presets_delete">Delete preset</string>
+    <string name="info_presets_delete_confirmation">Delete “%1$s”? The current dashboard blocks will stay unchanged.</string>
+    <string name="info_presets_duplicate">A preset with this name already exists.</string>
+</resources>
