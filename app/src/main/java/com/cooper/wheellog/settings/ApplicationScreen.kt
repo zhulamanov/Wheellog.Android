@@ -110,6 +110,8 @@ fun applicationScreen(
                 appConfig.useBetterPercents = it
             }
 
+            speedCorrectionPreference(appConfig)
+
             var customPercents by remember { mutableStateOf(appConfig.customPercents) }
             switchPref(
                 name = stringResource(R.string.custom_percents_title),

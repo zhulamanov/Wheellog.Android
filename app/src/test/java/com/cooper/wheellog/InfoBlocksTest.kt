@@ -120,5 +120,27 @@ class InfoBlocksTest {
         assertThrows(IllegalArgumentException::class.java) { config.infoBlockPresets.save(" ", emptyList(), emptySet()) }
     }
 
-
+    @Test fun `speed correction defaults clamps and per wheel settings survive language changes`() {
+        val config = AppConfig(localized("ru"))
+        config.lastMac = "AA:BB:01"
+        assertFalse(config.useSpeedCorrection)
+        assertEquals(0, config.speedCorrectionPercent)
+        config.speedCorrectionPercent = -99
+        config.useSpeedCorrection = true
+        assertEquals(-20, config.appliedSpeedCorrectionPercent)
+        config.speedCorrectionPercent = -10
+        val en = AppConfig(localized("en"))
+        assertEquals(-10, en.appliedSpeedCorrectionPercent)
+        en.lastMac = "AA:BB:02"
+        assertEquals(0, en.speedCorrectionPercent)
+        assertFalse(en.useSpeedCorrection)
+        en.speedCorrectionPercent = 100
+        en.useSpeedCorrection = true
+        assertEquals(20, en.appliedSpeedCorrectionPercent)
+        en.lastMac = "AA:BB:01"
+        assertEquals(-10, en.appliedSpeedCorrectionPercent)
+        en.useSpeedCorrection = false
+        assertEquals(0, en.appliedSpeedCorrectionPercent)
+        assertEquals(-10, en.speedCorrectionPercent)
+    }
 }

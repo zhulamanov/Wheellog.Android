@@ -37,6 +37,23 @@ class WheelDataTest: KoinTest {
     }
 
     @Test
+    fun `Wheel speed correction affects display and maximum while raw telemetry is preserved`() {
+        data.speed = 10_000
+        data.setTopSpeed(12_000)
+        every { appConfig.appliedSpeedCorrectionPercent } returns -10
+        assertThat(data.rawSpeedDouble).isEqualTo(100.0)
+        assertThat(data.speedDouble).isEqualTo(90.0)
+        assertThat(data.speed).isEqualTo(900)
+        assertThat(data.topSpeedDouble).isEqualTo(108.0)
+        assertThat(data.topSpeed).isEqualTo(10_800)
+        every { appConfig.appliedSpeedCorrectionPercent } returns 20
+        assertThat(data.speedDouble).isEqualTo(120.0)
+        assertThat(data.rawSpeedDouble).isEqualTo(100.0)
+        every { appConfig.appliedSpeedCorrectionPercent } returns 0
+        assertThat(data.speedDouble).isEqualTo(100.0)
+    }
+
+    @Test
     fun `Battery per km | 95 to 94`() {
         // Arrange.
         data.setBatteryLevel(95)

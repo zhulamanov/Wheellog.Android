@@ -10,13 +10,14 @@ import java.util.Locale
 
 /** Original CSV columns remain first; optional trailing columns preserve GPS fixes and gaps. */
 object NativeCsv {
-    const val HEADER = "date,time,latitude,longitude,gps_speed,gps_alt,gps_heading,gps_distance,speed,voltage,phase_current,current,power,torque,pwm,battery_level,distance,totaldistance,system_temp,temp2,tilt,roll,mode,alert,gps_time,gps_accuracy,track_segment"
+    const val HEADER = "date,time,latitude,longitude,gps_speed,gps_alt,gps_heading,gps_distance,speed,voltage,phase_current,current,power,torque,pwm,battery_level,distance,totaldistance,system_temp,temp2,tilt,roll,mode,alert,gps_time,gps_accuracy,track_segment,wheel_speed_raw,speed_correction_percent"
     fun row(time: Long, gps: TrackPoint?, wheel: NativeWheelSample?, meters: Double, segment: Boolean): String {
         val date = SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS", Locale.US).format(Date(time))
         val position = listOf(gps?.latitude, gps?.longitude, gps?.speedMps?.times(3.6), gps?.altitude,
             null, meters.takeIf { gps != null }).map { it?.toString() ?: "" }
         return date + "," + (position + (wheel?.columns ?: List(16) { "" }) + listOf(
-            gps?.time?.toString() ?: "", gps?.accuracy?.toString() ?: "", if (segment) "1" else "0"
+            gps?.time?.toString() ?: "", gps?.accuracy?.toString() ?: "", if (segment) "1" else "0",
+            wheel?.rawSpeedKmh?.toString() ?: "", wheel?.correctionPercent?.toString() ?: ""
         )).joinToString(",") { it.replace(',', ';').replace('\n', ' ').replace('\r', ' ') }
     }
 
@@ -113,11 +114,13 @@ object NativeCsv {
     }
 }
 
-data class NativeWheelSample(val columns: List<String>, val telemetry: TrackTelemetry) {
+data class NativeWheelSample(val columns: List<String>, val telemetry: TrackTelemetry,
+                             val rawSpeedKmh: Double? = null, val correctionPercent: Int = 0) {
     companion object {
         fun capture(data: WheelData, distance: Int, alert: String) = NativeWheelSample(listOf(data.speedDouble, data.voltageDouble, data.phaseCurrentDouble,
             data.currentDouble, data.powerDouble, data.torque, data.calculatedPwm, data.batteryLevel, distance,
             data.totalDistance, data.temperature, data.temperature2, data.angle, data.roll, data.modeStr, alert).map { it?.toString() ?: "" },
-            TrackTelemetry(data.speedDouble, data.batteryLevel, data.voltageDouble, data.temperature, data.calculatedPwm))
+            TrackTelemetry(data.speedDouble, data.batteryLevel, data.voltageDouble, data.temperature, data.calculatedPwm),
+            data.rawSpeedDouble, data.appliedSpeedCorrectionPercent)
     }
 }

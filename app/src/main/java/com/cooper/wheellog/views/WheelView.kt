@@ -330,6 +330,16 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         Arrays.sort(mViewBlocks)
     }
 
+    private fun drawSpeedCorrectionIndicator(canvas: Canvas, metric: String, metricOffset: Float) {
+        if (!appConfig.useSpeedCorrection) return
+        textPaint.textSize = speedTextKPHSize
+        val baseline = speedTextRect.bottom + speedTextKPHHeight * metricOffset
+        if (appConfig.useShortPwm) canvas.drawText(metric, outerArcRect.centerX(), baseline, textPaint)
+        textPaint.textSize = speedTextKPHSize * 0.55f
+        canvas.drawText(resources.getString(R.string.speed_correction_indicator), outerArcRect.centerX(),
+            baseline + speedTextKPHHeight * 0.8f, textPaint)
+    }
+
     fun resetBatteryLowest() {
         mBatteryLowest = 101
         refresh()
@@ -799,6 +809,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
             textPaint.color = getColorEx(R.color.wheelview_text)
             canvas.drawText(metric, outerArcRect.centerX(), speedTextRect.bottom + speedTextKPHHeight * 1.7f, textPaint)
         }
+        drawSpeedCorrectionIndicator(canvas, metric, 1.7f)
 
         //####################################################
         //######## DRAW BATTERY AND TEMPERATURE TEXT #########
@@ -1008,6 +1019,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
             textPaint.color = getColorEx(R.color.ajdm_wheelview_text)
             canvas.drawText(metric, outerArcRect.centerX(), speedTextRect.bottom + speedTextKPHHeight * 1.1f, textPaint)
         }
+        drawSpeedCorrectionIndicator(canvas, metric, 1.1f)
 
         //####################################################
         //######## DRAW BATTERY AND TEMPERATURE TEXT #########

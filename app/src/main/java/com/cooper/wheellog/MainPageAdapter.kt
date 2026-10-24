@@ -1058,6 +1058,10 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
             activity.pager.post { refreshConfiguredPages() }
             return
         }
+        if (key?.startsWith("speed_correction_") == true) {
+            updateScreen(true)
+            return
+        }
         when (appConfig.getResId(key)) {
             R.string.view_blocks_string, R.string.low_battery_color_threshold -> updateScreen(true)
             R.string.auto_upload_ec ->

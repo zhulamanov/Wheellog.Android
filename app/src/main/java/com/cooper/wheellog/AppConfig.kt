@@ -74,6 +74,17 @@ class AppConfig(var context: Context): KoinComponent {
         get() = getValue(R.string.use_better_percents, false)
         set(value) = setValue(R.string.use_better_percents, value)
 
+    var useSpeedCorrection: Boolean
+        get() = getValue("speed_correction_enabled_$lastMac", false)
+        set(value) = setValue("speed_correction_enabled_$lastMac", value)
+
+    var speedCorrectionPercent: Int
+        get() = getValue("speed_correction_percent_$lastMac", 0).coerceIn(-20, 20)
+        set(value) = setValue("speed_correction_percent_$lastMac", value.coerceIn(-20, 20))
+
+    val appliedSpeedCorrectionPercent: Int
+        get() = if (useSpeedCorrection) speedCorrectionPercent else 0
+
     var customPercents: Boolean
         get() = getValue(R.string.custom_percents, false)
         set(value) = setValue(R.string.custom_percents, value)

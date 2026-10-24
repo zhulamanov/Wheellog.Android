@@ -225,7 +225,7 @@ public class WheelData {
     }
 
     public int getSpeed() {
-        return (int) Math.round(mSpeed / 10.0);
+        return (int) Math.round(mSpeed / 10.0 * speedCorrectionFactor());
     }
 
     public void setSpeed(int speed) {
@@ -744,14 +744,14 @@ public class WheelData {
     public double getAverageSpeedDouble() {
         if (mTotalDistance != 0 && mRideTime != 0) {
             // 3.6 = (60 sec * 60 mim) / 1000 meters.
-            return getDistanceFromStart() * 3.6 / (mRideTime + mLastRideTime);
+            return getDistanceFromStart() * 3.6 / (mRideTime + mLastRideTime) * speedCorrectionFactor();
         } else return 0.0;
     }
 
     public double getAverageRidingSpeedDouble() {
         if (mTotalDistance != 0 && mRidingTime != 0) {
             // 3.6 = (60 sec * 60 mim) / 1000 meters.
-            return getDistanceFromStart() * 3.6 / mRidingTime;
+            return getDistanceFromStart() * 3.6 / mRidingTime * speedCorrectionFactor();
         } else return 0.0;
     }
 
@@ -775,8 +775,14 @@ public class WheelData {
     }
 
     public double getSpeedDouble() {
-        return mSpeed / 100.0;
+        return getRawSpeedDouble() * speedCorrectionFactor();
     }
+
+    public double getRawSpeedDouble() { return mSpeed / 100.0; }
+
+    public int getAppliedSpeedCorrectionPercent() { return appConfig.getAppliedSpeedCorrectionPercent(); }
+
+    private double speedCorrectionFactor() { return 1.0 + getAppliedSpeedCorrectionPercent() / 100.0; }
 
     public double getVoltageDouble() {
         return mVoltage / 100.0;
@@ -880,11 +886,11 @@ public class WheelData {
     }
 
     public int getTopSpeed() {
-        return mTopSpeed;
+        return (int) Math.round(mTopSpeed * speedCorrectionFactor());
     }
 
     public double getTopSpeedDouble() {
-        return mTopSpeed / 100.0;
+        return mTopSpeed / 100.0 * speedCorrectionFactor();
     }
 
     int getDistance() {
