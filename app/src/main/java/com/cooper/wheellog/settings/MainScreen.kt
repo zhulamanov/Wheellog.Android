@@ -18,6 +18,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cooper.wheellog.MainActivity
 import com.cooper.wheellog.R
+import com.cooper.wheellog.utils.ThemeManager
 
 enum class SettingsScreenEnum(@StringRes val title: Int) {
     Start(title = R.string.settings_title),
@@ -49,6 +50,8 @@ private fun settingsAppBar(
                 IconButton(onClick = navigateUp) {
                     Icon(
                         imageVector = Icons.Filled.ArrowBack,
+                        tint = if (ThemeManager.theme == R.style.InfernoTheme)
+                            MaterialTheme.colorScheme.primary else LocalContentColor.current,
                         contentDescription = ""
                     )
                 }
@@ -56,6 +59,8 @@ private fun settingsAppBar(
                 IconButton(onClick = { activity?.toggleSettings() }) {
                     Icon(
                         imageVector = Icons.Filled.Close,
+                        tint = if (ThemeManager.theme == R.style.InfernoTheme)
+                            MaterialTheme.colorScheme.primary else LocalContentColor.current,
                         contentDescription = ""
                     )
                 }

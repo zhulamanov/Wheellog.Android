@@ -42,19 +42,29 @@ class AppConfig(var context: Context): KoinComponent {
         set(value) = setValue(R.string.use_eng, value)
 
     var appThemeInt: Int
-        get() = getValue(R.string.app_theme, ThemeEnum.Original.value.toString()).toInt()
+        get() = ThemeEnum.fromInt(getValue(R.string.app_theme, ThemeEnum.Original.value.toString()).toIntOrNull() ?: 0).value
         set(value) = setValue(R.string.app_theme, value.toString())
 
     val appTheme: Int
         get() {
-            val stringVal = getValue(R.string.app_theme, ThemeEnum.Original.value.toString())
-            return when (ThemeEnum.fromInt(stringVal.toInt())) {
+            return when (ThemeEnum.fromInt(appThemeInt)) {
                 ThemeEnum.AJDM -> R.style.AJDMTheme
+                ThemeEnum.Contrast -> R.style.ContrastTheme
+                ThemeEnum.Inferno -> R.style.InfernoTheme
+                ThemeEnum.Porcelain -> R.style.PorcelainTheme
+                ThemeEnum.Polar -> R.style.PolarTheme
+                ThemeEnum.Jade -> R.style.JadeTheme
+                ThemeEnum.Steel -> R.style.SteelTheme
+                ThemeEnum.Heather -> R.style.HeatherTheme
                 else -> R.style.OriginalTheme
             }
         }
 
     var useComposeUI: Boolean = false
+
+    var lowBatteryColorThreshold: Int
+        get() = getValue(R.string.low_battery_color_threshold, 20).coerceIn(0, 100)
+        set(value) = setValue(R.string.low_battery_color_threshold, value.coerceIn(0, 100))
 
     var dayNightThemeMode: Int
         get() = getValue(R.string.day_night_theme, MODE_NIGHT_UNSPECIFIED.toString()).toInt()

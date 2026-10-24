@@ -88,7 +88,7 @@ class NotificationUtil(private val context: Context): KoinComponent {
             if (appConfig.mibandMode == MiBandEnum.Alarm) {
                 notificationView.setTextViewText(R.id.text_message, context.getString(R.string.alarmmiband))
             } else {
-                val template = when (appConfig.appTheme) {
+                val template = when (ThemeManager.theme) {
                     R.style.AJDMTheme -> R.string.notification_text_ajdm_theme
                     else -> R.string.notification_text
                 }
@@ -107,7 +107,7 @@ class NotificationUtil(private val context: Context): KoinComponent {
                     MiBandEnum.Max -> ThemeManager.getId(ThemeIconEnum.MenuMiBandMax)
                 })
         // Themes
-        if (appConfig.appTheme == R.style.AJDMTheme) {
+        if (ThemeManager.theme == R.style.AJDMTheme) {
             notificationView.setImageViewResource(R.id.icon, R.drawable.ajdm_notification_icon)
             notificationView.setInt(R.id.status_bar_latest_event_content, "setBackgroundResource", R.color.ajdm_background)
             val textColor = Color.BLACK

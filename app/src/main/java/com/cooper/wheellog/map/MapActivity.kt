@@ -73,6 +73,7 @@ class MapActivity : AppCompatActivity() {
         )
 
         tabs = binding.tabs
+        styleTripTabs(this, tabs)
         TabLayoutMediator(tabs, viewPager) { tab, position ->
             tab.text = tabNames[position]
         }.attach()

@@ -28,7 +28,7 @@ fun applicationScreen(
             AlertDialog(
                 onDismissRequest ={ restartRequiredAlert = false },
                 title = { Text(stringResource(R.string.use_eng_alert_title)) },
-                text = { Text(stringResource(R.string.use_eng_alert_description)) },
+                text = { Text(stringResource(R.string.palette_restart_description)) },
                 confirmButton = {
                     Button(onClick = { restartRequiredAlert = false }) {
                         Text(stringResource(android.R.string.ok))
@@ -51,11 +51,23 @@ fun applicationScreen(
             list(
                 name = stringResource(R.string.app_theme_title),
                 desc = stringResource(R.string.app_theme_description),
-                entries = ThemeEnum.values().associate { it.value.toString() to it.name },
+                entries = ThemeEnum.values().associate { it.value.toString() to stringResource(it.title) },
                 defaultKey = appConfig.appThemeInt.toString()
             ) {
-                restartRequiredAlert = true
                 appConfig.appThemeInt = it.first.toInt()
+                restartRequiredAlert = true
+            }
+
+            sliderPref(
+                name = stringResource(R.string.low_battery_color_threshold_title),
+                desc = stringResource(R.string.low_battery_color_threshold_description),
+                position = appConfig.lowBatteryColorThreshold.toFloat(),
+                min = 0f,
+                max = 100f,
+                unit = R.string.palette_percent_unit,
+                format = "%.0f",
+            ) {
+                appConfig.lowBatteryColorThreshold = it.toInt()
             }
 
             list(

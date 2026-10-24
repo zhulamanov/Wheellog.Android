@@ -22,6 +22,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import com.cooper.wheellog.utils.SomeUtil.getColorEx
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -606,6 +607,24 @@ class MainActivity : AppCompatActivity() {
             }
             else -> {}
         }
+        if (ThemeManager.palette != null) {
+            val menu = mMenu ?: return
+            for (index in 0 until menu.size()) {
+                val item = menu.getItem(index)
+                if (item == miWheel) continue
+                val active = (item == miWatch && PebbleService.isInstanceCreated()) ||
+                    (item == miLogging && LoggingService.isInstanceCreated())
+                item.icon?.mutate()?.setTint(getColorEx(if (active) R.color.accent else R.color.icons))
+            }
+            val wheelIcon = com.cooper.wheellog.utils.PaletteWheelIcon.create(
+                this, ThemeManager.palette!!,
+                connected = mConnectionState == ConnectionState.CONNECTED,
+                searching = isWheelSearch,
+            )
+            wheelIcon.alpha = if (mDeviceAddress.isEmpty()) 64 else 255
+            miWheel!!.icon = wheelIcon
+            (wheelIcon as? AnimationDrawable)?.start()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -653,6 +672,7 @@ class MainActivity : AppCompatActivity() {
 
         AppCompatDelegate.setDefaultNightMode(appConfig.dayNightThemeMode)
         setTheme(appConfig.appTheme)
+        ThemeManager.theme = appConfig.appTheme
         super.onCreate(savedInstanceState)
         volumeControlStream = AudioManager.STREAM_MUSIC
 
@@ -1053,12 +1073,12 @@ class MainActivity : AppCompatActivity() {
             if (snackbar == null) {
                 snackbar = Snackbar
                     .make(binding.mainView, "", Snackbar.LENGTH_LONG).apply {
-                        view.setBackgroundResource(R.color.primary_dark)
                         setAction(android.R.string.ok) { }
                     }
             }
             snackbar?.apply {
                 duration = timeout
+                com.cooper.wheellog.map.styleTripMessage(this@MainActivity, this)
                 setText(msg!!)
                 show()
             }

@@ -106,9 +106,9 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                     setHardwareAccelerationEnabled(true)
                     isHighlightPerTapEnabled = false
                     isHighlightPerDragEnabled = false
-                    legend.textColor = getColorEx(android.R.color.white)
+                    legend.textColor = getColorEx(R.color.wheelview_textblocks)
                     setNoDataText(resources.getString(R.string.no_chart_data))
-                    setNoDataTextColor(getColorEx(android.R.color.white))
+                    setNoDataTextColor(getColorEx(R.color.wheelview_textblocks))
                 }
 
                 val leftAxis: YAxis = chart1!!.axisLeft
@@ -117,12 +117,12 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                 rightAxis.axisMinimum = 0f
                 leftAxis.setDrawGridLines(false)
                 rightAxis.setDrawGridLines(false)
-                leftAxis.textColor = view.getColorEx(android.R.color.white)
-                rightAxis.textColor = view.getColorEx(android.R.color.white)
+                leftAxis.textColor = view.getColorEx(R.color.wheelview_textblocks)
+                rightAxis.textColor = view.getColorEx(R.color.wheelview_textblocks)
 
                 val xAxis: XAxis = chart1!!.xAxis
                 xAxis.position = XAxis.XAxisPosition.BOTTOM
-                xAxis.textColor = view.getColorEx(android.R.color.white)
+                xAxis.textColor = view.getColorEx(R.color.wheelview_textblocks)
                 xAxis.valueFormatter = chartAxisValueFormatter
             }
             R.layout.main_view_events -> {
@@ -259,7 +259,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                         dataSetCurrent.axisDependency = YAxis.AxisDependency.RIGHT
                         dataSetSpeed.mode = LineDataSet.Mode.CUBIC_BEZIER
                         dataSetCurrent.mode = LineDataSet.Mode.CUBIC_BEZIER
-                        dataSetSpeed.color = chart1!!.getColorEx(android.R.color.white)
+                        dataSetSpeed.color = chart1!!.getColorEx(R.color.wheelview_textblocks)
                         dataSetCurrent.color = chart1!!.getColorEx(R.color.accent)
                         dataSetSpeed.setDrawCircles(false)
                         dataSetCurrent.setDrawCircles(false)
@@ -1057,7 +1057,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                 removePage(R.layout.main_view_trips)
                 listOfTrips = null
             }
-            R.string.view_blocks_string -> updateScreen(true)
+            R.string.view_blocks_string, R.string.low_battery_color_threshold -> updateScreen(true)
             R.string.auto_upload_ec ->
                 GlobalScope.launch {
                     delay(500)

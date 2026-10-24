@@ -26,7 +26,8 @@ import org.robolectric.annotation.Config
 class StatsAppearanceTest {
     private fun contexts(): List<Context> {
         val base: Context = ApplicationProvider.getApplicationContext()
-        return listOf(R.style.OriginalTheme, R.style.AJDMTheme).flatMap { style ->
+        return listOf(R.style.OriginalTheme, R.style.AJDMTheme, R.style.ContrastTheme, R.style.InfernoTheme,
+            R.style.PorcelainTheme, R.style.PolarTheme, R.style.JadeTheme, R.style.SteelTheme, R.style.HeatherTheme).flatMap { style ->
             listOf(Configuration.UI_MODE_NIGHT_NO, Configuration.UI_MODE_NIGHT_YES).map { night ->
                 val configuration = Configuration(base.resources.configuration).apply { uiMode = night }
                 ContextThemeWrapper(base.createConfigurationContext(configuration), style)

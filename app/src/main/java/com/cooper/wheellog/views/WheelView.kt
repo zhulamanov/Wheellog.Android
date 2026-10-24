@@ -22,6 +22,7 @@ import com.cooper.wheellog.utils.SomeUtil
 import com.cooper.wheellog.utils.SomeUtil.getColorEx
 import com.cooper.wheellog.utils.StringUtil.toTempString
 import com.cooper.wheellog.utils.ThemeManager
+import com.cooper.wheellog.utils.PaletteSignals
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import timber.log.Timber
@@ -36,6 +37,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
     private var outerArcPaint = Paint()
     private var innerArcPaint = Paint()
     private var textPaint = Paint()
+    private val gaugeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val outerArcRect = RectF()
     private val innerArcRect = RectF()
     private val middleArcRect = RectF()
@@ -533,7 +535,8 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         if (landscape && w.toFloat() / h > 1.4 || !landscape && h.toFloat() / w > 1.1) {
             redrawTextBoxes()
         }
-        versionPaint.textSize = (height / 50.0).roundToInt().toFloat()
+        versionPaint.textSize = (height / 50.0).roundToInt().toFloat() *
+            if (ThemeManager.palette != null) 0.75f else 1f
         refresh()
     }
 
@@ -631,6 +634,9 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         val paintDescription = Paint(paint)
         paintDescription.textSize = boxTextSize / 2f
         paintDescription.alpha = 150
+        if (ThemeManager.palette != null) {
+            paintDescription.color = getColorEx(R.color.secondary_text)
+        }
         try {
             var i = 0
             for (block in mViewBlocks) {
@@ -711,6 +717,15 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         currentBattery = updateCurrentValue(targetBattery, currentBattery)
         val pwmColor = getPwmColor(WheelData.getInstance().calculatedPwm.toInt())
 
+        val customPalette = ThemeManager.palette != null
+        val speedWarning = PaletteSignals.isSpeedWarning(
+            customPalette, appConfig.pwmBasedAlarms, mSpeed, appConfig.alarm1Speed,
+        )
+        val batteryWarning = PaletteSignals.isBatteryWarning(
+            customPalette, mBattery, appConfig.lowBatteryColorThreshold,
+        )
+        val signalRed = getColorEx(R.color.palette_signal_red)
+
         //####################################################
         //################# DRAW OUTER ARC ###################
         //####################################################
@@ -725,6 +740,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                 outerArcPaint.color = getColorEx(R.color.wheelview_main_negative_dial)
             }
         }
+        if (speedWarning && appConfig.valueOnDial == "0") outerArcPaint.color = signalRed
         currentDial = abs(currentDial)
         //###########TEST purp
         //currentSpeed = (int) Math.round(( mCurrent /(10*mMaxSpeed)) * 112);
@@ -741,8 +757,9 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         canvas.drawArc(innerArcRect, 144f, 90f, false, innerArcPaint)
         canvas.drawArc(innerArcRect, 306f, 90f, false, innerArcPaint)
         innerArcPaint.color = getColorEx(R.color.wheelview_battery_dial)
+        if (batteryWarning) innerArcPaint.color = signalRed
         for (i in 0..111) {
-            if (i == targetBatteryLowest) innerArcPaint.color = getColorEx(R.color.wheelview_battery_low_dial)
+            if (i == targetBatteryLowest && !batteryWarning) innerArcPaint.color = getColorEx(R.color.wheelview_battery_low_dial)
             if (i == currentTemperature) innerArcPaint.color = getColorEx(R.color.wheelview_temperature_dial)
             if (i < currentBattery || i >= currentTemperature) {
                 val value = 144 + i * 2.25f
@@ -757,6 +774,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         val speedString: String = if (speed < 100) String.format(Locale.US, "%.1f", speed / 10.0) else String.format(Locale.US, "%02d", (speed / 10.0).roundToInt())
         val alarm1Speed = appConfig.alarm1Speed.toDouble()
         if (appConfig.swapSpeedPwm) textPaint.color = pwmColor
+        else if (speedWarning) textPaint.color = signalRed
         else if (!appConfig.pwmBasedAlarms && alarm1Speed * 10 > 0 && mSpeed >= alarm1Speed * 10) textPaint.color = getColorEx(R.color.accent)
         else textPaint.color = getColorEx(R.color.wheelview_speed_text)
         textPaint.textSize = speedTextSize
@@ -790,7 +808,9 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
             canvas.save()
             if (width > height) canvas.rotate(144 + currentBattery * 2.25f - 180, innerArcRect.centerX(), innerArcRect.centerY()) else canvas.rotate(144 + currentBattery * 2.25f - 180, innerArcRect.centerY(), innerArcRect.centerX())
             val bestBatteryString = String.format(Locale.US, "%02d%%", mBattery)
-            canvas.drawText(bestBatteryString, batteryTextRect.centerX(), batteryTextRect.centerY(), textPaint)
+            if (batteryWarning) textPaint.color = signalRed
+            drawGaugeLabel(canvas, bestBatteryString, batteryTextRect.centerX(), batteryTextRect.centerY())
+            textPaint.color = getColorEx(R.color.wheelview_text)
             canvas.restore()
             canvas.save()
             /// true battery
@@ -800,18 +820,18 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                 var batteryCalculateType = "true"
                 if (customPercents && !WheelData.getInstance().isVoltageTiltbackUnsupported) batteryCalculateType = "custom"
                 val batteryString = String.format(Locale.US, "%s", batteryCalculateType)
-                canvas.drawText(batteryString, batteryTextRect.centerX(), batteryTextRect.centerY(), textPaint)
+                drawGaugeLabel(canvas, batteryString, batteryTextRect.centerX(), batteryTextRect.centerY(), batteryMode = true)
                 canvas.restore()
                 canvas.save()
             }
             if (width > height) canvas.rotate(143.5f + currentTemperature * 2.25f, innerArcRect.centerX(), innerArcRect.centerY()) else canvas.rotate(143.5f + currentTemperature * 2.25f, innerArcRect.centerY(), innerArcRect.centerX())
-            canvas.drawText(mTemperature.toTempString(), temperatureTextRect.centerX(), temperatureTextRect.centerY(), textPaint)
+            drawGaugeLabel(canvas, mTemperature.toTempString(), temperatureTextRect.centerX(), temperatureTextRect.centerY())
             canvas.restore()
             canvas.save()
 
             // Max temperature
             if (width > height) canvas.rotate(-50f, innerArcRect.centerX(), innerArcRect.centerY()) else canvas.rotate(-50f, innerArcRect.centerY(), innerArcRect.centerX())
-            canvas.drawText(mMaxTemperature.toTempString(), temperatureTextRect.centerX(), temperatureTextRect.centerY(), textPaint)
+            drawGaugeLabel(canvas, mMaxTemperature.toTempString(), temperatureTextRect.centerX(), temperatureTextRect.centerY())
             canvas.restore()
             canvas.save()
         }
@@ -821,6 +841,25 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
 
         // Draw text blocks bitmap
         drawTextBlocksBitmap(canvas)
+    }
+
+    private fun drawGaugeLabel(canvas: Canvas, text: String, x: Float, y: Float, batteryMode: Boolean = false) {
+        if (ThemeManager.theme != R.style.InfernoTheme) {
+            canvas.drawText(text, x, y, textPaint)
+            return
+        }
+        gaugeLabelPaint.set(textPaint)
+        gaugeLabelPaint.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        gaugeLabelPaint.textSize = innerArcTextSize * if (batteryMode) 1.15f else 1.5f
+        // Outline first, then the original text color (including the low-charge warning).
+        gaugeLabelPaint.style = Paint.Style.STROKE
+        gaugeLabelPaint.strokeJoin = Paint.Join.ROUND
+        gaugeLabelPaint.strokeWidth = gaugeLabelPaint.textSize * if (batteryMode) 0.08f else 0.12f
+        gaugeLabelPaint.color = Color.BLACK
+        canvas.drawText(text, x, y, gaugeLabelPaint)
+        gaugeLabelPaint.style = Paint.Style.FILL
+        gaugeLabelPaint.color = textPaint.color
+        canvas.drawText(text, x, y, gaugeLabelPaint)
     }
 
     private fun drawAJDM(canvas: Canvas) {
@@ -1009,9 +1048,11 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
         canvas.drawBitmap(mTextBoxesBitmap!!, 0f, 0f, textPaint)
         refreshDisplay = currentSpeed != targetSpeed || currentCurrent != targetCurrent || currentPhaseCurrent != targetPhaseCurrent || currentBattery != targetBattery || currentTemperature != targetTemperature
         if (width * 1.2 < height) {
+            // Reserve the glyph descent inside the existing view, without moving the tiles.
+            val baseline = height - paddingBottom - if (ThemeManager.palette != null)
+                max(0f, versionPaint.fontMetrics.descent) else 0f
             canvas.drawText(versionString, (
-                    width - paddingRight).toFloat(), (
-                    height - paddingBottom).toFloat(),
+                    width - paddingRight).toFloat(), baseline,
                 versionPaint)
         }
     }
@@ -1149,7 +1190,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
                 Alarms.vibrate(context, longArrayOf(0, 50, 50))
                 val currentTitle = mViewBlocks.filter { it.enabled }[i].title
                 val items = mViewBlocks.filter { !it.enabled }.map { block -> block.title }
-                AlertDialog.Builder(context, R.style.OriginalTheme_Dialog_Alert)
+                AlertDialog.Builder(context)
                     .setIcon(R.drawable.ic_baseline_dashboard_customize_24)
                     .setTitle(
                         String.format(
@@ -1205,7 +1246,7 @@ class WheelView(context: Context, attrs: AttributeSet?) : View(context, attrs), 
             } catch (ignored: Exception) {
             }
         } else {
-            currentTheme = appConfig.appTheme
+            currentTheme = ThemeManager.dialTheme
         }
 
         useMph = appConfig.useMph
