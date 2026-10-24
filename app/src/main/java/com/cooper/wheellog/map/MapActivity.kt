@@ -209,6 +209,7 @@ class MapActivity : AppCompatActivity() {
             stats1 = chart1DataSets.filter { it.entryCount > 0 },
             stats2 = chart2DataSets.filter { it.entryCount > 0 },
             tripDb = db,
+            values = com.cooper.wheellog.data.TripValues.calculate(list),
             routePoints = NativeCsv.points(list),
             startedAt = list.firstOrNull()?.timestampMillis ?: 0,
             endedAt = list.lastOrNull()?.timestampMillis,

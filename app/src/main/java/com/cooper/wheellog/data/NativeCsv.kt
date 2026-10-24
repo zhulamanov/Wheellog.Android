@@ -51,7 +51,14 @@ object NativeCsv {
                 number("distance").toInt(), number("totaldistance").toInt(), time, wheel, located,
                 cell("gps_time").toLongOrNull() ?: time, number("gps_accuracy").takeIf { it > 0 }?.toFloat() ?: 10f,
                 number("gps_distance"), cell("track_segment") == "1", cell("pwm").toDoubleOrNull()?.isFinite() == true,
-                legacyStatistics))
+                legacyStatistics,
+                phaseCurrent = cell("phase_current").toDoubleOrNull()?.takeIf { it.isFinite() },
+                motorTemperature = cell("temp2").toDoubleOrNull()?.takeIf { it.isFinite() },
+                availablePower = cell("power").toDoubleOrNull()?.takeIf { it.isFinite() },
+                availableCurrent = cell("current").toDoubleOrNull()?.takeIf { it.isFinite() },
+                availableVoltage = cell("voltage").toDoubleOrNull()?.takeIf { it.isFinite() },
+                availableTemperature = cell("system_temp").toDoubleOrNull()?.takeIf { it.isFinite() },
+                gpsSpeedAvailable = cell("gps_speed").toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true))
         }
         result
     }

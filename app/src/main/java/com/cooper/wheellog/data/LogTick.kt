@@ -60,4 +60,11 @@ data class LogTick(
     val pwmAvailable: Boolean = wheelDataAvailable,
     /** Retain stock summary calculations for pre-extension WheelLog CSV files. */
     val legacyStatistics: Boolean = false,
+    val phaseCurrent: Double? = null,
+    val motorTemperature: Double? = null,
+    val availablePower: Double? = power.takeIf { wheelDataAvailable },
+    val availableCurrent: Double? = current.takeIf { wheelDataAvailable },
+    val availableVoltage: Double? = voltage.takeIf { wheelDataAvailable },
+    val availableTemperature: Double? = temperature.toDouble().takeIf { wheelDataAvailable },
+    val gpsSpeedAvailable: Boolean = hasLocation,
 )

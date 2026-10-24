@@ -14,6 +14,7 @@ data class TripData(
     val endedAt: Long? = routePoints.lastOrNull()?.time,
     val distanceMeters: Double = 0.0,
     val fileName: String = "",
+    val values: com.cooper.wheellog.data.TripValues? = null,
 ) {
     var errorMessage: String = ""
 }

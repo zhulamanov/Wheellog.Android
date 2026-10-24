@@ -11,4 +11,6 @@
     <string name="info_presets_delete">Delete preset</string>
     <string name="info_presets_delete_confirmation">Delete “%1$s”? The current dashboard blocks will stay unchanged.</string>
     <string name="info_presets_duplicate">A preset with this name already exists.</string>
+    <string name="trip_metric_wheel">wheel</string>
+    <string name="trip_metric_average">average</string>
 </resources>

@@ -26,6 +26,7 @@ import com.cooper.wheellog.LoggingService
 import com.cooper.wheellog.map.tripSurfaceColor
 import com.cooper.wheellog.map.tripTextColor
 import com.cooper.wheellog.map.tripMutedColor
+import com.cooper.wheellog.map.tripIconColor
 import com.cooper.wheellog.utils.SomeUtil.getColorEx
 import com.cooper.wheellog.R
 import com.cooper.wheellog.data.TripDao
@@ -192,40 +193,23 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
         }
 
         private fun setDescFromDb(trip: TripDataDbEntry?) {
-            if (trip != null) {
-                val min = context.getString(R.string.min)
-                var desc1: String
-                var desc2 = "⌚ ${trip.duration} $min"
-                if (appConfig.useMph) {
-                    val mph = context.getString(R.string.mph)
-                    val miles = context.getString(R.string.miles)
-                    desc1 = "\uD83D\uDE80 ${formatMi(trip.maxSpeed)} $mph" +
-                            "\n\uD83D\uDCE1 ${formatMi(trip.maxSpeedGps)} $mph" +
-                            "\n♿ ${formatMi(trip.avgSpeed)} $mph"
-                    desc2 += "\n\uD83D\uDCCF ${formatMi(trip.distance / 1000.0f)} $miles"
-                } else {
-                    val kmh = context.getString(R.string.kmh)
-                    val km = context.getString(R.string.km)
-                    desc1 = "\uD83D\uDE80 ${format(trip.maxSpeed)} $kmh" +
-                            "\n\uD83D\uDCE1 ${format(trip.maxSpeedGps)} $kmh" +
-                            "\n♿ ${format(trip.avgSpeed)} $kmh"
-                    desc2 += "\n\uD83D\uDCCF ${format(trip.distance / 1000.0f)} $km"
-                }
-                desc1 += "\n\uD83D\uDE31 ${trip.maxPwm}%"
-                if (trip.ecId != 0) {
-                    desc1 += "\n\uD83C\uDF10 electro.club"
-                }
-                desc2 +=
-                    "\n⚡ ${format(trip.consumptionTotal)} ${context.getString(R.string.wh)}" +
-                    "\n\uD83D\uDD0B " +
-                    if (appConfig.useMph) {
-                        "${format(trip.consumptionByKm / kmToMilesMultiplier.toFloat())} ${context.getString(R.string.whmi)}"
-                    } else {
-                        "${format(trip.consumptionByKm)} ${context.getString(R.string.whkm)}"
-                    }
-                itemBinding.description.text = desc1
-                itemBinding.description2.text = desc2
-            }
+            val color = context.tripTextColor()
+            val muted = context.tripMutedColor()
+            val locale = com.cooper.wheellog.LocaleManager.getLocale(context.resources)
+            fun number(value: Float?) = value?.let { String.format(locale, "%.2f", it) } ?: "—"
+            fun speed(value: Float?) = number(value?.let { if (appConfig.useMph) MathsUtil.kmToMiles(it) else it })
+            val speedUnit = context.getString(if (appConfig.useMph) R.string.mph else R.string.kmh)
+            val distanceUnit = context.getString(if (appConfig.useMph) R.string.miles else R.string.km)
+            fun bind(view: TripMetricView, icon: String, value: String, label: String) = view.bind(icon, value, label, color, muted, font)
+            bind(itemBinding.metricWheelSpeed, "🚀", speed(trip?.maxSpeed), "$speedUnit · " + context.getString(R.string.trip_metric_wheel))
+            bind(itemBinding.metricGpsSpeed, "📡", speed(trip?.maxSpeedGps), "$speedUnit · GPS")
+            bind(itemBinding.metricAverage, "♿", speed(trip?.avgSpeed), "$speedUnit · " + context.getString(R.string.trip_metric_average))
+            bind(itemBinding.metricPwm, "😱", number(trip?.maxPwm), "% · PWM")
+            bind(itemBinding.metricDuration, "⌚", trip?.duration?.toString() ?: "—", context.getString(R.string.min))
+            bind(itemBinding.metricDistance, "📏", speed(trip?.distance?.div(1000f)), distanceUnit)
+            bind(itemBinding.metricEnergy, "⚡", number(trip?.consumptionTotal), context.getString(R.string.wh))
+            val consumption = trip?.consumptionByKm?.let { if (appConfig.useMph) it / kmToMilesMultiplier.toFloat() else it }
+            bind(itemBinding.metricConsumption, "🔋", number(consumption), context.getString(if (appConfig.useMph) R.string.whmi else R.string.whkm))
         }
 
         private fun setFriendlyName() {
@@ -237,10 +221,10 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
                 if (dateTime != null) {
                     if (DateUtils.isToday(dateTime.time)) {
                         val text = itemBinding.name.context.getText(R.string.today).toString() +
-                                SimpleDateFormat(", EEE, HH:mm", Locale.getDefault()).format(dateTime)
+                                SimpleDateFormat(", EEE, HH:mm", com.cooper.wheellog.LocaleManager.getLocale(context.resources)).format(dateTime)
                         itemBinding.name.text = text
                     } else if (now - dateTime.time < 604_800_000) { // current week
-                        itemBinding.name.text = SimpleDateFormat("EEEE, HH:mm", Locale.getDefault()).format(dateTime)
+                        itemBinding.name.text = SimpleDateFormat("EEEE, HH:mm", com.cooper.wheellog.LocaleManager.getLocale(context.resources)).format(dateTime)
                     } else {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Year.now().value != Year.parse(itemBinding.name.text.subSequence(0, 4).toString()).value) {
                             skeleton = "yyyy $skeleton"
@@ -260,18 +244,8 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
             boundFileName = tripModel.fileName
             itemBinding.name.text = tripModel.title
             itemBinding.name.typeface = font
-            itemBinding.description.apply {
-                text = tripModel.description
-                typeface = font
-            }
-            itemBinding.description2.apply {
-                text = ""
-                typeface = font
-            }
-            setFriendlyName()
+            setDescFromDb(null)
             itemBinding.name.setTextColor(context.tripTextColor())
-            itemBinding.description.setTextColor(context.tripTextColor())
-            itemBinding.description2.setTextColor(context.tripTextColor())
             itemBinding.thumbnail.maximumSpeed = 1.0
             itemBinding.thumbnail.bind(tripModel, if (LoggingService.currentLogFileName == tripModel.fileName) LoggingService.status.value.points / 10 else 0)
             val titles = context.getSharedPreferences("trip_titles", Context.MODE_PRIVATE)
@@ -357,8 +331,8 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
             }
 
             // Themes
-            itemBinding.popupButton.setImageResource(R.drawable.ic_more_vert_24)
-            itemBinding.popupButton.imageTintList = android.content.res.ColorStateList.valueOf(context.tripMutedColor())
+            itemBinding.popupButton.setImageResource(R.drawable.ic_baseline_settings_24)
+            itemBinding.popupButton.imageTintList = android.content.res.ColorStateList.valueOf(context.tripIconColor())
         }
     }
 }

@@ -88,6 +88,15 @@ private object ThumbnailTiles {
 const val THUMBNAIL_ROUTE_COLOR: Int = 0xffff123d.toInt()
 
 class TrackThumbnailView @JvmOverloads constructor(context: Context, attrs: android.util.AttributeSet? = null) : View(context, attrs) {
+    init {
+        clipToOutline = true
+        outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 8 * resources.displayMetrics.density)
+            }
+        }
+    }
+
     private var job: Job? = null
     private var bindingKey: String? = null
     private var source: TripModel? = null

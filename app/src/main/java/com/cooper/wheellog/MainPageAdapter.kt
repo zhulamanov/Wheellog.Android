@@ -143,7 +143,6 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                 eventsTextView?.typeface = ThemeManager.getTypeface(view.context)
             }
             R.layout.main_view_trips -> {
-                view.findViewById<TextView>(R.id.logs_heading).setTextColor(view.context.tripBodyTextColor())
                 listOfTrips = view.findViewById(R.id.list_trips)
                 // listOfTrips?.addItemDecoration(DividerItemDecoration(activity, DividerItemDecoration.VERTICAL))
                 listOfTrips?.adapter = TripAdapter(activity, FileUtil.fillTrips(activity))
