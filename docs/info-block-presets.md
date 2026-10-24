@@ -5,6 +5,13 @@ Info blocks preference. Arrow buttons have localized accessibility labels. Chang
 to the active selection are applied with OK; cancel leaves that selection intact.
 Long-press replacement on the dashboard remains available.
 
+Selected blocks are grouped first in dashboard order; only these rows have reorder
+arrows. The remaining choices are sorted by their translated names using the current
+UI locale. Enabling a block appends it to the selected group; disabling it returns it
+to the alphabetical group immediately. Reopening the preference or loading a preset
+preserves the selected order and rebuilds the alphabetical group for the current
+language. Sorting inactive choices does not mark a loaded preset as modified.
+
 Persisted choices use stable resource-name IDs, independent of the display language.
 Existing translated labels are migrated using bundled language resources, preserving
 selection and order. The renderer and long-press replacement consume the IDs too,

@@ -19,7 +19,7 @@ internal fun InfoBlockPresetsControl(store: InfoBlockPresets, order: List<String
     var editName by remember { mutableStateOf<String?>(null) }
     var rename by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
-    val modified = active != null && (active.order != order || active.enabled != enabled)
+    val modified = active != null && (active.order.filter { it in active.enabled } != order.filter { it in enabled } || active.enabled != enabled)
     Box {
         TextButton(onClick = { expanded = true }) {
             Text(stringResource(R.string.info_presets_selection, active?.name ?: stringResource(R.string.info_presets_choose)) +

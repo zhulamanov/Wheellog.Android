@@ -11,6 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.text.Collator
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
@@ -142,5 +143,69 @@ class InfoBlocksTest {
         en.useSpeedCorrection = false
         assertEquals(0, en.appliedSpeedCorrectionPercent)
         assertEquals(-10, en.speedCorrectionPercent)
+    }
+
+    private fun assertEditorGroups(blocks: InfoBlocks, ctx: Context, result: List<String>, active: List<String>) {
+        assertEquals(active, result.take(active.size))
+        assertEquals(blocks.titles.keys, result.toSet())
+        assertEquals(result.size, result.distinct().size)
+        val collator = Collator.getInstance(LocaleManager.getLocale(ctx.resources))
+        result.drop(active.size).zipWithNext().forEach { (left, right) ->
+            assertTrue("inactive choices are out of alphabetical order", collator.compare(
+                ctx.getString(blocks.titles.getValue(left)), ctx.getString(blocks.titles.getValue(right))) <= 0)
+        }
+    }
+
+    @Test fun `editor groups selected blocks first and sorts other translated names in both languages`() {
+        val active = listOf("voltage", "distance", "pwm")
+        for (language in listOf("ru", "en")) {
+            val ctx = localized(language)
+            val blocks = InfoBlocks(ctx)
+            val interleaved = listOf("battery", "voltage", "temperature", "distance", "pwm")
+            assertEditorGroups(blocks, ctx, blocks.editorOrder(interleaved, active.toSet()), active)
+        }
+    }
+
+    @Test fun `newly enabled blocks append and disabled blocks return to alphabetical choices`() {
+        val ctx = localized("ru")
+        val blocks = InfoBlocks(ctx)
+        val active = listOf("distance", "voltage")
+        val initial = blocks.editorOrder(active + blocks.titles.keys, active.toSet())
+        val enabled = blocks.toggleInEditor(initial, active.toSet(), "battery", true)
+        assertEditorGroups(blocks, ctx, enabled, active + "battery")
+        val disabled = blocks.toggleInEditor(enabled, (active + "battery").toSet(), "distance", false)
+        assertEditorGroups(blocks, ctx, disabled, listOf("voltage", "battery"))
+        val reenabled = blocks.toggleInEditor(disabled, setOf("voltage", "battery"), "distance", true)
+        assertEditorGroups(blocks, ctx, reenabled, listOf("voltage", "battery", "distance"))
+    }
+
+    @Test fun `empty and full selections remain grouped without losing any block`() {
+        val ctx = localized("en")
+        val blocks = InfoBlocks(ctx)
+        val all = blocks.titles.keys.reversed()
+        assertEditorGroups(blocks, ctx, blocks.editorOrder(all, emptySet()), emptyList())
+        assertEquals(all, blocks.editorOrder(all, all.toSet()))
+        val single = blocks.toggleInEditor(all, emptySet(), "pwm", true)
+        assertEditorGroups(blocks, ctx, single, listOf("pwm"))
+        assertEditorGroups(blocks, ctx, blocks.toggleInEditor(single, setOf("pwm"), "pwm", false), emptyList())
+    }
+
+    @Test fun `saved editor and preset order survive reopening in another language`() {
+        val ru = localized("ru")
+        val config = AppConfig(ru)
+        val blocks = InfoBlocks(ru)
+        val active = listOf("pwm", "voltage", "distance")
+        val order = blocks.editorOrder(listOf("temperature") + active, active.toSet())
+        config.viewBlockIds = active
+        config.viewBlockOrder = order
+        val preset = config.infoBlockPresets.save("City", order, active.toSet())
+        val en = localized("en")
+        val restored = AppConfig(en)
+        val english = InfoBlocks(en)
+        assertEquals(active, restored.viewBlockIds)
+        assertEditorGroups(english, en, english.editorOrder(restored.viewBlockOrder, restored.viewBlockIds.toSet()), active)
+        val loaded = restored.infoBlockPresets.read().single()
+        assertEquals(preset, loaded)
+        assertEditorGroups(english, en, english.editorOrder(loaded.order, loaded.enabled), active)
     }
 }

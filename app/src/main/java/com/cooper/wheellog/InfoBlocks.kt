@@ -2,6 +2,7 @@ package com.cooper.wheellog
 
 import android.content.Context
 import android.content.res.Configuration
+import java.text.Collator
 import java.util.Locale
 
 /** Resource names are stable preference keys; translated titles are display-only. */
@@ -41,4 +42,23 @@ class InfoBlocks(private val context: Context) {
 
     fun order(values: List<String>, selected: List<String>): List<String> =
         (normalize(values).filter { it in titles } + selected.filter { it in titles } + titles.keys).distinct()
+
+    /** Only enabled blocks have a user-defined order. Other choices follow the UI language. */
+    fun editorOrder(values: List<String>, selected: Set<String>): List<String> {
+        val complete = order(values, selected.toList())
+        val collator = Collator.getInstance(LocaleManager.getLocale(context.resources))
+        return complete.filter { it in selected } + complete.filter { it !in selected }
+            .sortedWith { left, right ->
+                val result = collator.compare(context.getString(titles.getValue(left)), context.getString(titles.getValue(right)))
+                if (result == 0) left.compareTo(right) else result
+            }
+    }
+
+    fun toggleInEditor(values: List<String>, selected: Set<String>, key: String, enabled: Boolean): List<String> {
+        if (key !in titles) return editorOrder(values, selected)
+        val nextSelected = if (enabled) selected + key else selected - key
+        val nextOrder = if (enabled && key !in selected)
+            values.filter { it in selected } + key + values else values
+        return editorOrder(nextOrder, nextSelected)
+    }
 }

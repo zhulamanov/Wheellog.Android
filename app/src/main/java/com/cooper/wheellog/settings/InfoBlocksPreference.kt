@@ -27,8 +27,8 @@ fun infoBlocksPreference(config: AppConfig) {
     clickablePref(name = stringResource(R.string.view_blocks_title),
         desc = stringResource(R.string.info_blocks_order_description),
         themeIcon = ThemeIconEnum.SettingsBlocks) {
-        order = config.viewBlockOrder
         selected = config.viewBlockIds.toSet()
+        order = blocks.editorOrder(config.viewBlockOrder, selected)
         open = true
     }
     if (open) AlertDialog(onDismissRequest = { open = false },
@@ -37,25 +37,32 @@ fun infoBlocksPreference(config: AppConfig) {
             Column {
                 Text(stringResource(R.string.info_blocks_order_description), style = MaterialTheme.typography.bodySmall)
                 InfoBlockPresetsControl(config.infoBlockPresets, order, selected) { preset ->
-                    order = preset.order
                     selected = preset.enabled
+                    order = blocks.editorOrder(preset.order, selected)
                 }
                 LazyColumn {
                     itemsIndexed(order, key = { _, key -> key }) { index, key ->
                         val name = stringResource(blocks.titles.getValue(key))
+                        if (index == 0 && selected.isNotEmpty())
+                            Text(stringResource(R.string.info_blocks_enabled), style = MaterialTheme.typography.titleSmall)
+                        if (index == selected.size)
+                            Text(stringResource(R.string.info_blocks_disabled), style = MaterialTheme.typography.titleSmall)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = key in selected, onCheckedChange = { checked ->
+                                order = blocks.toggleInEditor(order, selected, key, checked)
                                 selected = if (checked) selected + key else selected - key
                             })
                             Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                             fun move(offset: Int) {
                                 order = order.toMutableList().apply { java.util.Collections.swap(this, index, index + offset) }
                             }
-                            IconButton(onClick = { move(-1) }, enabled = index > 0) {
-                                Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.dashboard_move_up, name))
-                            }
-                            IconButton(onClick = { move(1) }, enabled = index < order.lastIndex) {
-                                Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.dashboard_move_down, name))
+                            if (key in selected) {
+                                IconButton(onClick = { move(-1) }, enabled = index > 0) {
+                                    Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.dashboard_move_up, name))
+                                }
+                                IconButton(onClick = { move(1) }, enabled = index < selected.size - 1) {
+                                    Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.dashboard_move_down, name))
+                                }
                             }
                         }
                     }

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="info_blocks_order_description">Выберите блоки под спидометром. Используйте стрелки, чтобы изменить их порядок.</string>
+    <string name="info_blocks_order_description">Выбранные блоки находятся сверху. Меняйте их порядок стрелками. Остальные блоки отсортированы по имени.</string>
+    <string name="info_blocks_enabled">Выбранные блоки</string>
+    <string name="info_blocks_disabled">Остальные блоки</string>
     <string name="info_presets_selection">Пресеты: %1$s</string>
     <string name="info_presets_choose">выбрать или сохранить</string>
     <string name="info_presets_save_new">Сохранить новый пресет (%1$d/%2$d)</string>
