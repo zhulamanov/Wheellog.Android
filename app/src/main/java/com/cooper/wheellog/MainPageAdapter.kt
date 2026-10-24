@@ -17,6 +17,9 @@ import com.cooper.wheellog.utils.StringUtil.toTempString
 import com.cooper.wheellog.utils.ThemeManager
 import com.cooper.wheellog.views.TripAdapter
 import com.cooper.wheellog.views.WheelView
+import com.cooper.wheellog.map.tripBodyTextColor
+import com.cooper.wheellog.map.tripTextColor
+import com.cooper.wheellog.track.TrackPanel
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.components.YAxis
@@ -28,6 +31,14 @@ import kotlinx.coroutines.*
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.*
+
+internal fun mainDashboardPages(graph: Boolean, events: Boolean) = mutableListOf(
+    R.layout.main_view_main, R.layout.main_view_params_list
+).apply {
+    if (graph) add(R.layout.main_view_graph)
+    add(R.layout.main_view_trips)
+    if (events) add(R.layout.main_view_events)
+}
 
 class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainActivity) : RecyclerView.Adapter<MainPageAdapter.ViewHolder>(), OnSharedPreferenceChangeListener, KoinComponent {
     private val appConfig: AppConfig by inject()
@@ -60,7 +71,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                 pages.add(index, page)
             }
             pagesView[page] = null
-            notifyItemInserted(page)
+            notifyItemInserted(pages.indexOf(page))
         }
     }
 
@@ -79,6 +90,13 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
     fun updatePageOfTrips() {
         if (listOfTrips != null) {
             (listOfTrips!!.adapter as TripAdapter).updateTrips(FileUtil.fillTrips(activity))
+        }
+    }
+
+    fun pageIndex(layout: Int) = pages.indexOf(layout)
+    fun updateTrackPages() {
+        pagesView.forEach { (layout, view) ->
+            (view as? TrackPanel)?.setPageActive(position in pages.indices && pages[position] == layout)
         }
     }
 
@@ -131,6 +149,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
                 eventsTextView?.typeface = ThemeManager.getTypeface(view.context)
             }
             R.layout.main_view_trips -> {
+                view.findViewById<TextView>(R.id.logs_heading).setTextColor(view.context.tripBodyTextColor())
                 listOfTrips = view.findViewById(R.id.list_trips)
                 // listOfTrips?.addItemDecoration(DividerItemDecoration(activity, DividerItemDecoration.VERTICAL))
                 listOfTrips?.adapter = TripAdapter(activity, FileUtil.fillTrips(activity))
@@ -1042,7 +1061,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (appConfig.getResId(key)) {
             R.string.show_page_graph -> if (appConfig.pageGraph) {
-                addPage(R.layout.main_view_graph, 2)
+                addPage(R.layout.main_view_graph, if (pages.contains(R.layout.main_view_smart_bms)) 3 else 2)
             } else {
                 removePage(R.layout.main_view_graph)
             }

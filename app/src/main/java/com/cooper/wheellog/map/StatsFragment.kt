@@ -50,7 +50,7 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
 
     private val chartAxisValueFormatter: ValueFormatter = object : ValueFormatter() {
         override fun getFormattedValue(value: Float): String {
-            return timeFormatter.format(Date((value).toLong() * 100))
+            return timeFormatter.format(Date((viewModel.selectedItem.value?.startedAt ?: 0L) + (value * 100).toLong()))
         }
     }
 
@@ -87,8 +87,9 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
 
     private fun tripDataReceived(chart: LineChart, stats: List<LineDataSet>) {
         chart.apply {
+            if (stats.none { it.entryCount > 0 }) { clear(); return }
             data = LineData().apply {
-                stats.forEach {
+                stats.filter { it.entryCount > 0 }.forEach {
                     addDataSet(it)
                 }
             }
@@ -98,13 +99,10 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
     }
 
     override fun onValueSelected(e: Entry?, h: Highlight?) {
-        if (h != null) {
-            if (binding.chart1.data.getDataSetByIndex(h.dataSetIndex) != null) {
-                binding.chart1.highlightValues(arrayOf(h))
-            }
-            if (binding.chart2.data.getDataSetByIndex(h.dataSetIndex) != null) {
-                binding.chart2.highlightValues(arrayOf(h))
-            }
+        if (h == null) return
+        for (chart in listOf(binding.chart1, binding.chart2)) {
+            val index = chart.data?.dataSets?.indexOfFirst { it.entryCount > 0 } ?: -1
+            if (index >= 0) chart.highlightValues(arrayOf(Highlight(h.x, Float.NaN, index)))
         }
     }
 

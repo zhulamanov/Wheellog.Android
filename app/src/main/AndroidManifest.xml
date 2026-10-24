@@ -112,7 +112,7 @@
             android:foregroundServiceType="connectedDevice"
             android:exported="false" />
         <service android:name=".LoggingService"
-            android:foregroundServiceType="location"
+            android:foregroundServiceType="location|connectedDevice"
             android:exported="false" />
         <service android:name="com.cooper.wheellog.GearService"
             android:foregroundServiceType="connectedDevice"

@@ -243,7 +243,12 @@ class AppConfig(var context: Context): KoinComponent {
 
     var logLocationData: Boolean
         get() = getValue(R.string.log_location_data, false)
-        set(value) = setValue(R.string.log_location_data, value)
+        set(value) {
+            setValue(R.string.log_location_data, value)
+            if (!value) {
+                LoggingService.disableLocation()
+            }
+        }
 
     var ecUserId: String?
         get() = getValue(R.string.ec_user_id, null)
@@ -289,8 +294,15 @@ class AppConfig(var context: Context): KoinComponent {
 
     var mainMenuButtons: Array<String>
         get() = getValue<String?>("main_menu_buttons", null)?.split(separator)?.toTypedArray()
-            ?: arrayOf("watch")
+            ?: arrayOf("watch", "record")
         set(value) = setValue("main_menu_buttons", value.joinToString(separator))
+
+    fun migrateRecordButtonVisibility() {
+        if (!getValue("record_button_visibility_migrated", false)) {
+            mainMenuButtons = (mainMenuButtons + "record").distinct().toTypedArray()
+            setValue("record_button_visibility_migrated", true)
+        }
+    }
 
     var showClock: Boolean
         get() = getValue("show_clock", true)

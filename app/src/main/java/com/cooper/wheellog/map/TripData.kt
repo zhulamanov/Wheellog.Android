@@ -8,7 +8,12 @@ data class TripData(
     val geoLine: List<LogGeoPoint> = emptyList(),
     val stats1: List<LineDataSet> = emptyList(),
     val stats2: List<LineDataSet> = emptyList(),
-    val tripDb: TripDataDbEntry? = null
+    val tripDb: TripDataDbEntry? = null,
+    val routePoints: List<com.cooper.wheellog.track.TrackPoint> = emptyList(),
+    val startedAt: Long = routePoints.firstOrNull()?.time ?: 0,
+    val endedAt: Long? = routePoints.lastOrNull()?.time,
+    val distanceMeters: Double = 0.0,
+    val fileName: String = "",
 ) {
     var errorMessage: String = ""
 }

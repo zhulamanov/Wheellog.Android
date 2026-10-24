@@ -361,7 +361,6 @@ class MainActivity : AppCompatActivity() {
                             ConnectionState.DISCONNECTED.value
                         )
                     )
-                    loggingService?.updateConnectionState(connectionState)
                     val isWheelSearch =
                         intent.getBooleanExtra(Constants.INTENT_EXTRA_WHEEL_SEARCH, false)
                     val isDirectConnectionFailed =
@@ -377,14 +376,9 @@ class MainActivity : AppCompatActivity() {
                     setConnectionState(connectionState, isWheelSearch)
                     WheelData.getInstance().isConnected =
                         connectionState == ConnectionState.CONNECTED
+                    LoggingService.noteConnection(connectionState == ConnectionState.CONNECTED)
                     when (connectionState) {
                         ConnectionState.CONNECTED -> {
-                            if (!LoggingService.isInstanceCreated() &&
-                                appConfig.autoLog &&
-                                appConfig.startAutoLoggingWhenIsMovingMore == 0f
-                            ) {
-                                toggleLoggingService()
-                            }
                             if (WheelData.getInstance().wheelType == WHEEL_TYPE.KINGSONG) {
                                 KingsongAdapter.getInstance().requestNameData()
                             }
@@ -429,21 +423,19 @@ class MainActivity : AppCompatActivity() {
                     Timber.i("Reset battery lowest")
                     pagerAdapter.wheelView?.resetBatteryLowest()
                 }
+                Constants.ACTION_TRACK_CHANGED -> if (!onDestroyProcess) {
+                    pagerAdapter.updatePageOfTrips()
+                    updateTrackRecordIcon()
+                    notifications.update()
+                }
                 Constants.ACTION_WHEEL_DATA_AVAILABLE -> {
-                    loggingService?.updateFile()
                     if (wearOs != null) {
                         wearOs!!.sendUpdateData()
                     }
                     if (appConfig.mibandMode !== MiBandEnum.Alarm) {
                         notifications.update()
                     }
-                    if (!LoggingService.isInstanceCreated() &&
-                        appConfig.startAutoLoggingWhenIsMovingMore != 0f &&
-                        appConfig.autoLog &&
-                        WheelData.getInstance().speedDouble > appConfig.startAutoLoggingWhenIsMovingMore
-                    ) {
-                        toggleLoggingService()
-                    }
+                    LoggingService.maybeAutoStart(this@MainActivity, appConfig)
                     if (appConfig.alarmsEnabled) {
                         checkAlarm(
                             WheelData.getInstance().calculatedPwm / 100,
@@ -545,6 +537,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setMenuIconStates() {
         if (mMenu == null) return
+        updateTrackRecordIcon()
         if (mDeviceAddress.isEmpty()) {
             miWheel!!.isEnabled = false
             miWheel!!.icon!!.alpha = 64
@@ -625,6 +618,7 @@ class MainActivity : AppCompatActivity() {
             miWheel!!.icon = wheelIcon
             (wheelIcon as? AnimationDrawable)?.start()
         }
+        updateTrackRecordIcon()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -636,17 +630,8 @@ class MainActivity : AppCompatActivity() {
         // add pages into main view
         pager = binding.pager
         pager.offscreenPageLimit = 10
-        val pages = ArrayList<Int>()
-        pages.add(R.layout.main_view_main)
-        pages.add(R.layout.main_view_params_list)
-        if (appConfig.pageGraph) {
-            pages.add(R.layout.main_view_graph)
-        }
-        if (appConfig.pageTrips) {
-            pages.add(R.layout.main_view_trips)
-        }
-        if (appConfig.pageEvents) {
-            pages.add(R.layout.main_view_events)
+        val pages = mainDashboardPages(appConfig.pageGraph, appConfig.pageEvents).apply {
+            if (!appConfig.pageTrips) remove(R.layout.main_view_trips)
         }
         pagerAdapter = MainPageAdapter(pages, this)
         pager.adapter = pagerAdapter
@@ -654,6 +639,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
                 pagerAdapter.position = position
+                pagerAdapter.updateTrackPages()
                 pagerAdapter.updateScreen(true)
             }
         })
@@ -665,18 +651,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        if (onDestroyProcess) {
-            Process.killProcess(Process.myPid())
-            return
-        }
-
         AppCompatDelegate.setDefaultNightMode(appConfig.dayNightThemeMode)
+        appConfig.migrateRecordButtonVisibility()
         setTheme(appConfig.appTheme)
         ThemeManager.theme = appConfig.appTheme
+        ThemeManager.changeAppIcon(this)
         super.onCreate(savedInstanceState)
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         binding = ActivityMainBinding.inflate(layoutInflater)
+        lifecycle.coroutineScope.launch {
+            LoggingService.status.collect { updateTrackRecordIcon() }
+        }
+        LoggingService.ensureArmed(this, appConfig)
 
         if (appConfig.useComposeUI) {
             // на Compose
@@ -752,10 +739,16 @@ class MainActivity : AppCompatActivity() {
                 AppTheme(useDarkTheme = true) {
                     settingsNavHostController = rememberNavController()
                     mainScreen(navController = settingsNavHostController!!)
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        savedInstanceState?.getString("settingsRoute")?.takeIf { it != "Start" && it != settingsNavHostController?.currentDestination?.route }?.let {
+                            settingsNavHostController!!.navigate(it)
+                        }
+                    }
                 }
             }
         }
 
+        if (savedInstanceState?.getBoolean("settingsVisible") == true) binding.settingsView.visibility = View.VISIBLE
         checkBatteryOptimizationsAndShowAlert(this)
         // for test without wheel go to isHardwarePWM and comment Unknown case
         // DialogHelper.INSTANCE.checkPWMIsSetAndShowAlert(this);
@@ -772,6 +765,8 @@ class MainActivity : AppCompatActivity() {
 
     public override fun onResume() {
         super.onResume()
+        handleTrackIntent()
+        LoggingService.ensureArmed(this, appConfig)
         isPaused = false
         if (bluetoothService != null && mConnectionState != bluetoothService!!.connectionState && isWheelSearch != bluetoothService!!.isWheelSearch) {
             setConnectionState(
@@ -835,6 +830,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putBoolean("settingsVisible", binding.settingsView.visibility == View.VISIBLE)
+        outState.putString("settingsRoute", settingsNavHostController?.currentDestination?.route)
         outState.putInt(ConnectionState::class.simpleName, mConnectionState.value)
         outState.putBoolean(isWheelSearch::class.simpleName, isWheelSearch)
     }
@@ -849,64 +846,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (!this.isFinishing) {
-            Timber.wtf("Recreate main activity")
-            return
-        }
-        // Real finish.
-        Timber.wtf("-=[ finish ]=-")
-        onDestroyProcess = true
-        if (wearOs != null) {
-            wearOs!!.stop()
-        }
+        eventsLoggingTree?.let { Timber.uproot(it); it.close() }
+        eventsLoggingTree = null
+        runCatching { unregisterReceiver(mCoreBroadcastReceiver) }
+        if (loggingService != null) runCatching { unbindService(mLoggingServiceConnection) }
+        if (!isFinishing) return // Theme/configuration recreation must not stop the recorder or Bluetooth.
+        LoggingService.command(this, LoggingService.EXIT)
+        wearOs?.stop()
         stopPebbleService()
         stopGarminConnectIQ()
-        stopLoggingService()
+        DashboardBluetoothBinding.release(this)
         WheelData.getInstance().full_reset()
-        if (bluetoothService != null) {
-            try {
-                unbindService(mBLEServiceConnection)
-                WheelData.getInstance().bluetoothService = null
-            } catch (_: Exception) {
-                // ignored
+        object : CountDownTimer(120_000L, 1_000L) {
+            override fun onTick(remaining: Long) {
+                if (!LoggingService.isAlive) { cancel(); notifications.close() }
             }
-        }
-        if (loggingService != null) {
-            try {
-                unbindService(mLoggingServiceConnection)
-            } catch (_: Exception) {
-                // ignored
-            }
-        }
-        ThemeManager.changeAppIcon(this@MainActivity)
-        object : CountDownTimer((2 * 60 * 1000 /* 2 min */).toLong(), 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                if (!LoggingService.isInstanceCreated()) {
-                    onFinish()
-                }
-            }
-
-            override fun onFinish() {
-                notifications.close()
-                Timber.uproot(eventsLoggingTree!!)
-                eventsLoggingTree!!.close()
-                eventsLoggingTree = null
-                try {
-                    unregisterReceiver(mCoreBroadcastReceiver)
-                } catch (_: Exception) {
-                    // ignore
-                }
-                // Kill YandexMetrika process.
-                val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-                val runningProcesses = am.runningAppProcesses
-                for (process in runningProcesses) {
-                    if (Process.myPid() != process.pid) {
-                        Process.killProcess(process.pid)
-                    }
-                }
-                // Kill self process.
-                Process.killProcess(Process.myPid())
-            }
+            override fun onFinish() { if (!LoggingService.isAlive) notifications.close() }
         }.start()
     }
 
@@ -925,18 +880,27 @@ class MainActivity : AppCompatActivity() {
             miLogging = findItem(R.id.miLogging)
         }
 
+        setMenuIconStates()
         // Themes
-        if (appConfig.appTheme == R.style.AJDMTheme) {
+        if (ThemeManager.theme == R.style.AJDMTheme) {
             val miSettings = mMenu!!.findItem(R.id.miSettings)
             miSettings.setIcon(ThemeManager.getId(ThemeIconEnum.MenuSettings))
             miSearch!!.setIcon(ThemeManager.getId(ThemeIconEnum.MenuBluetooth))
         }
+        if (ThemeManager.palette != null) {
+            binding.toolbar.overflowIcon?.mutate()?.setTint(getColorEx(R.color.icons))
+        }
+        updateTrackRecordIcon()
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         Alarms.vibrate(this, longArrayOf(0, 30, 40))
         return when (item.itemId) {
+            R.id.miTrackRecord -> {
+                showTrackControlMenu()
+                true
+            }
             R.id.miSearch -> {
                 startScanActivity()
                 true
@@ -946,47 +910,7 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             R.id.miLogging -> {
-                if (LoggingService.isInstanceCreated() && appConfig.continueThisDayLog) {
-                    val dialog = AlertDialog.Builder(this)
-                        .setTitle(R.string.continue_this_day_log_alert_title)
-                        .setMessage(R.string.continue_this_day_log_alert_description)
-                        .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
-                            appConfig.continueThisDayLogMacException =
-                                appConfig.lastMac
-                            toggleLogging()
-                        }
-                        .setNegativeButton(android.R.string.cancel) { _: DialogInterface?, _: Int -> toggleLogging() }
-                        .create()
-                    dialog.setOnShowListener(object : OnShowListener {
-                        val AUTO_DISMISS_MILLIS = 5000
-                        override fun onShow(dialog: DialogInterface) {
-                            val defaultButton =
-                                (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE)
-                            val negativeButtonText = defaultButton.text
-                            object : CountDownTimer(AUTO_DISMISS_MILLIS.toLong(), 100) {
-                                override fun onTick(millisUntilFinished: Long) {
-                                    defaultButton.text = String.format(
-                                        Locale.getDefault(), "%s (%d)",
-                                        negativeButtonText,
-                                        TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) + 1
-                                    )
-                                }
-
-                                override fun onFinish() {
-                                    if (dialog.isShowing) {
-                                        appConfig.continueThisDayLogMacException =
-                                            appConfig.lastMac
-                                        toggleLogging()
-                                        dialog.dismiss()
-                                    }
-                                }
-                            }.start()
-                        }
-                    })
-                    dialog.show()
-                } else {
-                    toggleLogging()
-                }
+                toggleLogging()
                 true
             }
             R.id.miWatch -> {
@@ -1010,6 +934,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val trackPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted[android.Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            LoggingService.command(this, LoggingService.START)
+            showTrackMap()
+        } else showSnackBar(R.string.track_permission_error)
+    }
+
+    fun requestTrackRecording() {
+        if (!appConfig.logLocationData) { showSnackBar(R.string.track_location_disabled); return }
+        if (LoggingService.hasPermission(this)) {
+            LoggingService.command(this, LoggingService.START)
+            showTrackMap()
+        } else trackPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    private fun showTrackMap() {
+        val index = pagerAdapter.pageIndex(R.layout.main_view_trips)
+        if (index >= 0) pager.setCurrentItem(index, true)
+    }
+
+    private var trackMenuRequested = false
+
+    private fun showTrackControlMenu() {
+        if (mMenu?.findItem(R.id.miTrackRecord) == null) { trackMenuRequested = true; return }
+        trackMenuRequested = false
+        val anchor = binding.toolbar.findViewById<View>(R.id.miTrackRecord) ?: binding.toolbar
+        com.cooper.wheellog.track.TrackRecordingControl.showMenu(this, anchor, LoggingService.status.value, appConfig.logLocationData) { action ->
+            if (action == LoggingService.START) requestTrackRecording() else LoggingService.command(this, action)
+        }
+    }
+
+    private fun updateTrackRecordIcon() {
+        val item = mMenu?.findItem(R.id.miTrackRecord) ?: return
+        item.isVisible = appConfig.mainMenuButtons.contains("record")
+        val state = LoggingService.status.value
+        item.setIcon(com.cooper.wheellog.track.TrackRecordingControl.icon(state))
+        item.title = getString(R.string.track_title) + " · " + getString(com.cooper.wheellog.track.TrackRecordingControl.title(state))
+        item.icon?.mutate()?.setTint(com.cooper.wheellog.track.TrackRecordingControl.color(state))
+        if (trackMenuRequested) binding.toolbar.post { if (trackMenuRequested) showTrackControlMenu() }
+    }
+
+    private fun handleTrackIntent() {
+        if (!intent.getBooleanExtra(LoggingService.CONTROL_EXTRA, false)) return
+        intent.removeExtra(LoggingService.CONTROL_EXTRA)
+        trackMenuRequested = true
+        binding.toolbar.post { if (trackMenuRequested) showTrackControlMenu() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleTrackIntent()
+    }
+
     fun toggleSettings() {
         if (binding.settingsView.visibility != View.VISIBLE) {
             binding.settingsView.apply {
@@ -1028,6 +1006,7 @@ class MainActivity : AppCompatActivity() {
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         binding.settingsView.visibility = View.GONE
+                        setMenuIconStates()
                     }
                 })
 
@@ -1098,17 +1077,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun toggleLoggingService() {
-        val dataLoggerServiceIntent = Intent(applicationContext, LoggingService::class.java)
-        if (LoggingService.isInstanceCreated()) {
-            unbindService(mLoggingServiceConnection)
-            if (!onDestroyProcess) {
-                CoroutineScope(Dispatchers.Main + Job()).launch {
-                    pagerAdapter.updatePageOfTrips()
-                }
-            }
-        } else if (mConnectionState == ConnectionState.CONNECTED) {
-            bindService(dataLoggerServiceIntent, mLoggingServiceConnection, BIND_AUTO_CREATE)
-        }
+        LoggingService.command(this, if (LoggingService.isInstanceCreated()) LoggingService.STOP else LoggingService.START)
     }
 
     private fun stopPebbleService() {
@@ -1159,10 +1128,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun startBluetoothService() {
         if (checkBlePermissions(this, RESULT_REQUEST_PERMISSIONS_BT)
-            && bluetoothService == null
+
         ) {
-            val bluetoothServiceIntent = Intent(applicationContext, BluetoothService::class.java)
-            bindService(bluetoothServiceIntent, mBLEServiceConnection, BIND_AUTO_CREATE)
+            DashboardBluetoothBinding.ensure(this, mDeviceAddress)
 //            YandexMetrica.reportEvent("BluetoothService is starting.")
         } else if (isMaxBleReq) {
             showSnackBar(R.string.bluetooth_required)
@@ -1285,6 +1253,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun makeCoreIntentFilter(): IntentFilter {
         val intentFilter = IntentFilter()
+        intentFilter.addAction(Constants.ACTION_TRACK_CHANGED)
         intentFilter.addAction(Constants.ACTION_BLUETOOTH_CONNECTION_STATE)
         intentFilter.addAction(Constants.ACTION_WHEEL_DATA_AVAILABLE)
         intentFilter.addAction(Constants.ACTION_LOGGING_SERVICE_TOGGLED)

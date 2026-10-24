@@ -234,11 +234,13 @@ fun applicationScreen(
             multiList(
                 name = stringResource(R.string.main_menu_buttons_title),
                 entries = mapOf(
+                    "record" to stringResource(R.string.track_title),
                     "watch" to stringResource(R.string.start_pebble_service),
                     "miband" to stringResource(R.string.miband_desc),
                     "reset" to stringResource(R.string.reset_max_values_title),
                 ),
                 keyIcons = mapOf(
+                    "record" to R.drawable.ic_track_record,
                     "watch" to R.drawable.ic_action_watch_white,
                     "miband" to R.drawable.ajdm_ic_mi_med,
                     "reset" to R.drawable.ic_action_reset,

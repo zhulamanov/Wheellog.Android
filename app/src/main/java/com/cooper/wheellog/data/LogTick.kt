@@ -50,4 +50,14 @@ data class LogTick(
      * Total distance in meters
      */
     val totalDistance: Int,
+    val timestampMillis: Long = 0,
+    val wheelDataAvailable: Boolean = true,
+    val hasLocation: Boolean = latitude != 0.0 || longitude != 0.0,
+    val gpsTimestampMillis: Long = timestampMillis,
+    val gpsAccuracy: Float = 10f,
+    val gpsDistanceMeters: Double = 0.0,
+    val segmentStart: Boolean = false,
+    val pwmAvailable: Boolean = wheelDataAvailable,
+    /** Retain stock summary calculations for pre-extension WheelLog CSV files. */
+    val legacyStatistics: Boolean = false,
 )
