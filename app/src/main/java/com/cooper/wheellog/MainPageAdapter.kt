@@ -32,14 +32,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.*
 
-internal fun mainDashboardPages(graph: Boolean, events: Boolean) = mutableListOf(
-    R.layout.main_view_main, R.layout.main_view_params_list
-).apply {
-    if (graph) add(R.layout.main_view_graph)
-    add(R.layout.main_view_trips)
-    if (events) add(R.layout.main_view_events)
-}
-
 class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainActivity) : RecyclerView.Adapter<MainPageAdapter.ViewHolder>(), OnSharedPreferenceChangeListener, KoinComponent {
     private val appConfig: AppConfig by inject()
     private var xAxisLabels = ArrayList<String>()
@@ -63,28 +55,30 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
         sharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
     }
 
+    private var smartBmsAvailable = false
+
+    fun refreshConfiguredPages() {
+        val current = pages.getOrNull(activity.pager.currentItem)
+        val next = DashboardPages.visible(appConfig.dashboardPageOrder, appConfig.dashboardVisiblePages, smartBmsAvailable)
+        if (pages == next) return
+        pagesView.keys.filter { it !in next }.toList().forEach { pagesView.remove(it) }
+        if (R.layout.main_view_events !in next) eventsTextView = null
+        if (R.layout.main_view_trips !in next) listOfTrips = null
+        pages.clear(); pages.addAll(next)
+        notifyDataSetChanged()
+        val selected = pages.indexOf(current).coerceAtLeast(0)
+        activity.pager.setCurrentItem(selected, false)
+        position = selected
+    }
+
     fun addPage(page: Int, index: Int = 0) {
-        if (!pages.contains(page)) {
-            if (index == 0 || index >= pages.size) {
-                pages.add(page)
-            } else {
-                pages.add(index, page)
-            }
-            pagesView[page] = null
-            notifyItemInserted(pages.indexOf(page))
-        }
+        if (page == R.layout.main_view_smart_bms) smartBmsAvailable = true
+        refreshConfiguredPages()
     }
 
     fun removePage(page: Int) {
-        if (pages.contains(page)) {
-            if (page == R.layout.main_view_events) {
-                eventsTextView = null
-            }
-            val index = pages.indexOf(page)
-            pages.removeAt(index)
-            pagesView.remove(page)
-            notifyItemRemoved(index)
-        }
+        if (page == R.layout.main_view_smart_bms) smartBmsAvailable = false
+        refreshConfiguredPages()
     }
 
     fun updatePageOfTrips() {
@@ -760,7 +754,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
         when (WheelData.getInstance().wheelType) {
             WHEEL_TYPE.KINGSONG -> {
                 if (inArray(WheelData.getInstance().model, arrayOf("KS-S20", "KS-S22", "KS-S19", "KS-S16", "KS-S16P", "KS-F22P", "KS-F18P", "KS-14SP"))) {
-                    addPage(R.layout.main_view_smart_bms, 2)
+                    addPage(R.layout.main_view_smart_bms, 3)
                     setupFieldForSmartBmsPage(R.string.bmsSn)
                     setupFieldForSmartBmsPage(R.string.bmsFw)
                     setupFieldForSmartBmsPage(R.string.bmsFactoryCap)
@@ -855,7 +849,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
             }
             WHEEL_TYPE.VETERAN -> {
                 if (inArray(WheelData.getInstance().model, arrayOf("Lynx", "Lynx S", "Sherman L", "Nosfet Apex", "Nosfet Aeon", "Patton S", "Nosfet Aero", "Oryx"))) {
-                    addPage(R.layout.main_view_smart_bms, 2)
+                    addPage(R.layout.main_view_smart_bms, 3)
                     setupFieldForSmartBmsPage(R.string.bmsCurrent)
                     setupFieldForSmartBmsPage(R.string.bmsVoltage)
                     setupFieldForSmartBmsPage(R.string.bmsTemp1)
@@ -922,7 +916,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
             WHEEL_TYPE.GOTWAY -> {
                 val data = WheelData.getInstance()
                 if (data.bms1.cellNum > 0) {
-                    addPage(R.layout.main_view_smart_bms, 2)
+                    addPage(R.layout.main_view_smart_bms, 3)
                     setupFieldForSmartBmsPage(R.string.bmsCurrent)
                     setupFieldForSmartBmsPage(R.string.bmsVoltage)
                     setupFieldForSmartBmsPage(R.string.bmsSemiVoltage1)
@@ -1004,7 +998,7 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
             }
             WHEEL_TYPE.NINEBOT_Z -> {
                 if (WheelData.getInstance().protoVer == "") { //hide page for S2
-                    addPage(R.layout.main_view_smart_bms, 2)
+                    addPage(R.layout.main_view_smart_bms, 3)
                     setupFieldForSmartBmsPage(R.string.bmsSn)
                     setupFieldForSmartBmsPage(R.string.bmsFw)
                     setupFieldForSmartBmsPage(R.string.bmsFactoryCap)
@@ -1059,23 +1053,12 @@ class MainPageAdapter(private var pages: MutableList<Int>, val activity: MainAct
     //endregion
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        if (key == "dashboard_page_order" || key == "dashboard_visible_pages" ||
+            key == activity.getString(R.string.show_page_graph) || key == activity.getString(R.string.show_page_events)) {
+            activity.pager.post { refreshConfiguredPages() }
+            return
+        }
         when (appConfig.getResId(key)) {
-            R.string.show_page_graph -> if (appConfig.pageGraph) {
-                addPage(R.layout.main_view_graph, if (pages.contains(R.layout.main_view_smart_bms)) 3 else 2)
-            } else {
-                removePage(R.layout.main_view_graph)
-            }
-            R.string.show_page_events -> if (appConfig.pageEvents) {
-                addPage(R.layout.main_view_events)
-            } else {
-                removePage(R.layout.main_view_events)
-            }
-            R.string.show_page_trips -> if (appConfig.pageTrips) {
-                addPage(R.layout.main_view_trips)
-            } else {
-                removePage(R.layout.main_view_trips)
-                listOfTrips = null
-            }
             R.string.view_blocks_string, R.string.low_battery_color_threshold -> updateScreen(true)
             R.string.auto_upload_ec ->
                 GlobalScope.launch {

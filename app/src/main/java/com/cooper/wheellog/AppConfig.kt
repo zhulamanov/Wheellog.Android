@@ -297,6 +297,16 @@ class AppConfig(var context: Context): KoinComponent {
             ?: arrayOf("watch", "record")
         set(value) = setValue("main_menu_buttons", value.joinToString(separator))
 
+    var dashboardPageOrder: List<String>
+        get() = com.cooper.wheellog.DashboardPages.normalizeOrder(getValue<String?>("dashboard_page_order", null)?.split("|") ?: emptyList())
+        set(value) = setValue("dashboard_page_order", com.cooper.wheellog.DashboardPages.normalizeOrder(value).joinToString("|"))
+
+    var dashboardVisiblePages: Set<String>
+        get() = getValue<String?>("dashboard_visible_pages", null)?.split("|")?.toSet()?.plus("main")
+            ?: setOf("main", "values", "bms") + (if (pageTrips) setOf("trips") else emptySet()) + (if (pageGraph) setOf("graph") else emptySet()) +
+                (if (pageEvents) setOf("events") else emptySet())
+        set(value) = setValue("dashboard_visible_pages", (value + "main").joinToString("|"))
+
     fun migrateRecordButtonVisibility() {
         if (!getValue("record_button_visibility_migrated", false)) {
             mainMenuButtons = (mainMenuButtons + "record").distinct().toTypedArray()

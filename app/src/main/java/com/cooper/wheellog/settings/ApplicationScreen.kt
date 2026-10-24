@@ -360,30 +360,7 @@ fun applicationScreen(
         }
 
         group(name = stringResource(R.string.dashboard_pages_category_title)) {
-            switchPref(
-                name = stringResource(R.string.show_page_graph_title),
-                default = appConfig.pageGraph,
-            ) {
-                appConfig.pageGraph = it
-            }
-
-            switchPref(
-                name = stringResource(R.string.show_page_events_title),
-                desc = stringResource(R.string.show_page_events_description),
-                themeIcon = ThemeIconEnum.SettingsPageEvents,
-                default = appConfig.pageEvents,
-            ) {
-                appConfig.pageEvents = it
-            }
-
-            switchPref(
-                name = stringResource(R.string.show_page_trips_title),
-                themeIcon = ThemeIconEnum.SettingsPageTrips,
-                default = appConfig.pageTrips,
-                showDiv = false,
-            ) {
-                appConfig.pageTrips = it
-            }
+            dashboardPagesPreference(appConfig)
         }
 
         group(name = stringResource(R.string.audio_category_title)) {

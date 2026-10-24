@@ -29,6 +29,67 @@ class TrackDashboardTest {
         startKoin { modules(module { single { config } }) }
     }
     @After fun cleanup() { DashboardBluetoothBinding.release(context); unmockkAll(); stopKoin() }
+    @Test fun `default pages match upstream with optional graph events and BMS`() {
+        for (graph in listOf(false, true)) for (events in listOf(false, true)) {
+            config.pageGraph = graph
+            config.pageEvents = events
+            val pages = DashboardPages.visible(config.dashboardPageOrder, config.dashboardVisiblePages, false).toMutableList()
+            val activity = mockk<MainActivity>(relaxed = true)
+            every { activity.pager } returns ViewPager2(context)
+            val adapter = MainPageAdapter(pages, activity)
+            val original = mutableListOf(R.layout.main_view_main, R.layout.main_view_params_list).apply {
+                if (graph) add(R.layout.main_view_graph)
+                add(R.layout.main_view_trips)
+                if (events) add(R.layout.main_view_events)
+            }
+            assertEquals(original, pages)
+            adapter.addPage(R.layout.main_view_smart_bms)
+            assertEquals(original.toMutableList().apply { add(2, R.layout.main_view_smart_bms) }, pages)
+            adapter.removePage(R.layout.main_view_smart_bms)
+            assertEquals(original, pages)
+        }
+    }
+    @Test fun `application and existing launcher aliases use original WheelLog artwork`() {
+        assertEquals(R.mipmap.ic_launcher, context.applicationInfo.icon)
+        for ((alias, icon) in listOf("OriginalIconAlias" to R.mipmap.ic_launcher, "AjdmIconAlias" to R.drawable.ajdm_notification_icon)) {
+            val component = ComponentName(context, "com.cooper.wheellog.$alias")
+            val info = context.packageManager.getActivityInfo(component, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+            assertEquals(icon, info.iconResource)
+        }
+    }
+    @Test fun `existing upstream hidden pages seed visibility without re enabling trips`() {
+        config.pageTrips = false
+        config.pageGraph = false
+        config.pageEvents = false
+        assertEquals(listOf(R.layout.main_view_main, R.layout.main_view_params_list),
+            DashboardPages.visible(config.dashboardPageOrder, config.dashboardVisiblePages, false))
+        config.dashboardVisiblePages = setOf("main", "values", "trips")
+        assertEquals(listOf(R.layout.main_view_main, R.layout.main_view_params_list, R.layout.main_view_trips),
+            DashboardPages.visible(config.dashboardPageOrder, config.dashboardVisiblePages, false))
+    }
+    @Test fun `main stays first and visible while all other screens can be disabled`() {
+        config.dashboardPageOrder = listOf("graph", "main", "trips", "graph", "bogus", "bms")
+        config.dashboardVisiblePages = emptySet()
+        val saved = AppConfig(context)
+        assertEquals("main", saved.dashboardPageOrder.first())
+        assertEquals(6, saved.dashboardPageOrder.size)
+        assertEquals(listOf(R.layout.main_view_main), DashboardPages.visible(saved.dashboardPageOrder, saved.dashboardVisiblePages, true))
+    }
+    @Test fun `reordered and hidden screens survive BMS availability changes`() {
+        config.dashboardPageOrder = listOf("values", "bms", "trips", "graph", "events")
+        config.dashboardVisiblePages = setOf("values", "trips", "bms")
+        val activity = mockk<MainActivity>(relaxed = true)
+        every { activity.pager } returns ViewPager2(context)
+        val pages = DashboardPages.visible(config.dashboardPageOrder, config.dashboardVisiblePages, false).toMutableList()
+        val adapter = MainPageAdapter(pages, activity)
+        adapter.addPage(R.layout.main_view_smart_bms)
+        assertEquals(listOf(R.layout.main_view_main, R.layout.main_view_params_list, R.layout.main_view_smart_bms, R.layout.main_view_trips), pages)
+        config.dashboardVisiblePages = setOf("values", "trips")
+        adapter.removePage(R.layout.main_view_smart_bms)
+        adapter.addPage(R.layout.main_view_smart_bms)
+        assertEquals(-1, adapter.pageIndex(R.layout.main_view_smart_bms))
+        assertEquals(listOf("main", "values", "bms", "trips", "graph", "events"), AppConfig(context).dashboardPageOrder)
+    }
     @Test fun `record visibility migration runs once and respects later hiding`() {
         config.mainMenuButtons = arrayOf("watch", "light")
         config.migrateRecordButtonVisibility()

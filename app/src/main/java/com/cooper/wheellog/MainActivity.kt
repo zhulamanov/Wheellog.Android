@@ -630,9 +630,7 @@ class MainActivity : AppCompatActivity() {
         // add pages into main view
         pager = binding.pager
         pager.offscreenPageLimit = 10
-        val pages = mainDashboardPages(appConfig.pageGraph, appConfig.pageEvents).apply {
-            if (!appConfig.pageTrips) remove(R.layout.main_view_trips)
-        }
+        val pages = DashboardPages.visible(appConfig.dashboardPageOrder, appConfig.dashboardVisiblePages, false).toMutableList()
         pagerAdapter = MainPageAdapter(pages, this)
         pager.adapter = pagerAdapter
         pager.registerOnPageChangeCallback(object : OnPageChangeCallback() {
