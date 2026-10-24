@@ -213,6 +213,7 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
         }
 
         private fun setFriendlyName() {
+            val locale = com.cooper.wheellog.LocaleManager.getLocale(context.resources)
             val sdf = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US)
             try {
                 val dateTime = sdf.parse(itemBinding.name.text.toString())
@@ -221,16 +222,16 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
                 if (dateTime != null) {
                     if (DateUtils.isToday(dateTime.time)) {
                         val text = itemBinding.name.context.getText(R.string.today).toString() +
-                                SimpleDateFormat(", EEE, HH:mm", com.cooper.wheellog.LocaleManager.getLocale(context.resources)).format(dateTime)
+                                SimpleDateFormat(", EEE, HH:mm", locale).format(dateTime)
                         itemBinding.name.text = text
                     } else if (now - dateTime.time < 604_800_000) { // current week
-                        itemBinding.name.text = SimpleDateFormat("EEEE, HH:mm", com.cooper.wheellog.LocaleManager.getLocale(context.resources)).format(dateTime)
+                        itemBinding.name.text = SimpleDateFormat("EEEE, HH:mm", locale).format(dateTime)
                     } else {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Year.now().value != Year.parse(itemBinding.name.text.subSequence(0, 4).toString()).value) {
                             skeleton = "yyyy $skeleton"
                         }
-                        val bestFormat = DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton)
-                        val sdfName = SimpleDateFormat(bestFormat, Locale.getDefault())
+                        val bestFormat = DateFormat.getBestDateTimePattern(locale, skeleton)
+                        val sdfName = SimpleDateFormat(bestFormat, locale)
                         itemBinding.name.text = sdfName.format(dateTime)
                     }
                 }
@@ -244,6 +245,7 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
             boundFileName = tripModel.fileName
             itemBinding.name.text = tripModel.title
             itemBinding.name.typeface = font
+            setFriendlyName()
             setDescFromDb(null)
             itemBinding.name.setTextColor(context.tripTextColor())
             itemBinding.thumbnail.maximumSpeed = 1.0

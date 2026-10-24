@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.cooper.wheellog.AppConfig
 import com.cooper.wheellog.R
 import kotlin.math.roundToInt
@@ -24,7 +26,7 @@ fun speedCorrectionPreference(config: AppConfig) {
     }
     AnimatedVisibility(enabled) {
         Column {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(enabled = percent > -20, onClick = { percent--; config.speedCorrectionPercent = percent }) {
                     Icon(Icons.Default.Remove, stringResource(R.string.speed_correction_decrease))
                 }
@@ -34,7 +36,9 @@ fun speedCorrectionPreference(config: AppConfig) {
                 IconButton(enabled = percent < 20, onClick = { percent++; config.speedCorrectionPercent = percent }) {
                     Icon(Icons.Default.Add, stringResource(R.string.speed_correction_increase))
                 }
-                Text(if (percent > 0) "+$percent%" else "$percent%")
+                Text(if (percent > 0) "+$percent%" else "$percent%",
+                    modifier = Modifier.widthIn(min = 48.dp).padding(start = 4.dp),
+                    textAlign = TextAlign.End, maxLines = 1, softWrap = false)
             }
         }
     }
