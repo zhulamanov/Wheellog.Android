@@ -23,12 +23,10 @@ data class TripValues(
                 if (speed > 0.1) { movingSeconds += dt; movingSpeedSeconds += speed * dt }
             }
             val wheel = ticks.filter { it.wheelDataAvailable }
-            val timed = ticks.filter { it.recordingElapsedMillis != null }
             // A filtered route omits stationary coordinates, not stationary time.
-            // Old files have only wall-clock timestamps; pauses cannot be reconstructed.
-            val totalSeconds = if (timed.size >= 2)
-                ((timed.last().recordingElapsedMillis!! - timed.first().recordingElapsedMillis!!).coerceAtLeast(0) / 1000.0)
-            else if (points.size >= 2) (points.last().time - points.first().time).coerceAtLeast(0) / 1000.0 else 0.0
+            // Older files lack a recording clock: count short recorded intervals,
+            // but never interpret an unrecorded morning-to-lunch gap as a stop.
+            val totalSeconds = TripRecordingTime.seconds(ticks)
             return TripValues(
                 speeds.maxOrNull(), (speedSeconds / totalSeconds).takeIf { seconds > 0 && totalSeconds > 0 },
                 if (seconds <= 0) null else if (movingSeconds > 0) movingSpeedSeconds / movingSeconds else 0.0,

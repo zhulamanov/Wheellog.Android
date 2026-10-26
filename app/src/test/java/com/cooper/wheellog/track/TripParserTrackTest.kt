@@ -62,7 +62,8 @@ class TripParserTrackTest {
             val data = JSONObject(trip.additionalJson!!)
             assertEquals(25.0, data.getDouble("movingAverageSpeed"), 0.001)
             assertEquals(303_000L, data.getLong("endedAt") - data.getLong("startedAt"))
-            assertEquals(5, trip.duration)
+            assertEquals(0, trip.duration) // three recorded seconds, not the five-minute gap
+            assertEquals(0, data.getInt("activeDurationMinutes"))
             assertEquals(TripParser.STATS_VERSION, data.getInt("tripStatsVersion"))
         } finally { stopKoin() }
     }

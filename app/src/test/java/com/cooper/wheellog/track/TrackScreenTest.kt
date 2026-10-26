@@ -46,7 +46,9 @@ class TrackScreenTest {
     @After fun cleanup() { ThemeManager.theme = R.style.OriginalTheme; unmockkAll(); stopKoin() }
     private fun trip(): TripData {
         val first = TrackPoint(1_000, 56.8, 60.6, null, 5f, 10f, true)
-        return TripData("Поездка к реке", routePoints = listOf(first, first.copy(time = 61_000, latitude = 56.802, segmentStart = false)),
+        return TripData("Поездка к реке", routePoints = listOf(first,
+            first.copy(time = 31_000, latitude = 56.801, segmentStart = false),
+            first.copy(time = 61_000, latitude = 56.802, segmentStart = false)),
             startedAt = 1_000, endedAt = 61_000, distanceMeters = 200.0, fileName = "native.csv")
     }
     private fun texts(view: View): List<TextView> = if (view is ViewGroup)
@@ -181,6 +183,24 @@ class TrackScreenTest {
             assertEquals(paused, panel.timeline.progress)
             panel.play.performClick()
             shadowOf(android.os.Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
+            assertEquals(panel.timeline.max, panel.timeline.progress)
+            assertEquals(base.getString(R.string.track_play), panel.play.text.toString())
+        } finally { panel.dispose() }
+    }
+    @Test fun `replay controls skip an unrecorded daily gap and retain the selected real timestamp`() {
+        val panel = TrackMapPanel(ContextThemeWrapper(base, R.style.InfernoTheme))
+        try {
+            val route = trip().routePoints
+            val lunch = 4 * 3_600_000L
+            panel.showTrip(trip().copy(routePoints = listOf(route[0], route[1],
+                route[0].copy(time = lunch, segmentStart = true), route[1].copy(time = lunch + 30_000)), endedAt = lunch + 30_000))
+            panel.play.performClick()
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+            assertTrue(panel.timeline.progress in 5_900..6_100)
+            val timestamp = java.text.SimpleDateFormat("dd.MM HH:mm:ss", java.util.Locale.getDefault())
+                .format(java.util.Date(lunch + 6_000))
+            assertTrue(texts(panel).single { it.text.contains("PWM") }.text.startsWith(timestamp))
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
             assertEquals(panel.timeline.max, panel.timeline.progress)
             assertEquals(base.getString(R.string.track_play), panel.play.text.toString())
         } finally { panel.dispose() }

@@ -37,21 +37,37 @@ class TrackVisualsTest {
         assertEquals(100_000L, playback.advance(31_000, 100_000))
         assertEquals(100_000L, playback.advance(40_000, 100_000))
     }
-    @Test fun `timeline follows elapsed time and does not invent positions across pauses`() {
+    @Test fun `timeline skips missing hours and follows real timing within each recorded segment`() {
         val points = listOf(point(1_000, true), point(11_000), point(601_000, true), point(611_000))
-        val middle = TrackTimeline.select(points, 5_000, 1_000, 611_000)!!
-        assertEquals(306_000L, middle.requestedTime)
-        assertEquals(1, middle.index)
-        assertTrue(middle.inGap)
-        assertEquals(0, TrackTimeline.select(points, 0, 1_000, 611_000)!!.index)
-        val end = TrackTimeline.select(points, 10_000, 1_000, 611_000)!!
+        val timeline = TrackTimeline(points)
+        assertEquals(20_000L, timeline.durationMillis)
+        val middle = timeline.select(5_000)!!
+        assertEquals(601_000L, middle.requestedTime)
+        assertEquals(2, middle.index)
+        assertFalse(middle.inGap)
+        assertEquals(0, timeline.select(0)!!.index)
+        assertEquals(6_000L, timeline.select(2_500)!!.requestedTime)
+        val end = timeline.select(10_000)!!
         assertEquals(3, end.index); assertFalse(end.inGap)
-        assertNull(TrackTimeline.select(emptyList(), 50, 0, 100))
+        assertEquals(611_000L, end.requestedTime)
+        assertNull(TrackTimeline(emptyList()).select(50))
     }
-    @Test fun `timeline exposes the initial GPS acquisition gap`() {
-        val selected = TrackTimeline.select(listOf(point(60_000)), 0, 0, 120_000)!!
-        assertTrue(selected.inGap)
-        assertEquals(0L, selected.requestedTime)
+    @Test fun `single position is selectable without replaying the GPS acquisition delay`() {
+        val timeline = TrackTimeline(listOf(point(60_000)))
+        val selected = timeline.select(0)!!
+        assertFalse(selected.inGap)
+        assertEquals(60_000L, selected.requestedTime)
+        assertEquals(0L, timeline.durationMillis)
+    }
+    @Test fun `playback at sixty times crosses the morning gap without spending hours on missing samples`() {
+        val timeline = TrackTimeline(listOf(point(0, true), point(30_000),
+            point(4 * 3_600_000L, true), point(4 * 3_600_000L + 30_000)))
+        val playback = TrackPlayback()
+        playback.start(0, 0)
+        val elapsed = playback.advance(750, timeline.durationMillis)
+        val selection = timeline.select((elapsed * TrackTimeline.STEPS / timeline.durationMillis).toInt())!!
+        assertEquals(4 * 3_600_000L + 15_000, selection.requestedTime)
+        assertEquals(60_000L, playback.advance(1_000, timeline.durationMillis))
     }
     @Test fun `render reduction keeps both sides of every segment boundary`() {
         val points = (0..10_000).map { point(it * 1_000L, it == 0 || it == 5_001) }

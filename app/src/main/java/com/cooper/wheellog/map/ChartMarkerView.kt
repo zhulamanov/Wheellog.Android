@@ -39,14 +39,16 @@ class ChartMarkerView(context: Context, private val valueFormatter: ValueFormatt
             tvTitle.text = valueFormatter.getFormattedValue(e.x)
             val text = SpannableStringBuilder()
             val format = DecimalFormat("0.##")
-            stats.forEachIndexed { index, dataSet ->
+            stats.groupBy { it.label }.values.forEachIndexed { index, segments ->
+                val dataSet = segments.first()
                 if (index > 0) text.append('\n')
                 val start = text.length
                 text.append("■ ")
                 // The swatch is independently contrast-correct on the marker surface.
                 text.setSpan(ForegroundColorSpan(statsHueColor(dataSet.color, context.statsMarkerBackgroundColor())),
                     start, start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                val value = dataSet.getEntriesForXValue(e.x).firstOrNull()?.y?.takeIf { it.isFinite() }
+                val value = segments.asSequence().flatMap { it.getEntriesForXValue(e.x).asSequence() }
+                    .firstOrNull()?.y?.takeIf { it.isFinite() }
                 text.append(dataSet.label).append(": ").append(value?.let { format.format(it) } ?: "—")
             }
             tvData.text = text

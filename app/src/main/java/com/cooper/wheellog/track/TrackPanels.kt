@@ -96,7 +96,7 @@ abstract class TrackPanel(context: Context) : LinearLayout(context), KoinCompone
     protected fun speed(value: Double): String = String.format(Locale.getDefault(), "%.1f", if (config.useMph) MathsUtil.kmToMiles(value.toFloat()).toDouble() else value)
 }
 
-/** Real route replay; the elapsed-time axis includes pauses rather than spreading points uniformly. */
+/** Replay preserves recorded timing and skips gaps with no recorded position. */
 class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, private val fixedId: String? = null) : TrackPanel(context) {
     private val subtitle = label(size = 18f)
     private val appearance = TrackAppearance(context)
@@ -109,6 +109,7 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private val cursor: Marker
     private var track: TripData? = null
     private var points = emptyList<TrackPoint>()
+    private var recordedTimeline = TrackTimeline(points)
     private var shownId: String? = null
     private var shownCount = -1
     private var follow = true
@@ -119,11 +120,10 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private val player = object : Runnable {
         override fun run() {
             if (!playing) return
-            val saved = track ?: return
-            val end = saved.endedAt ?: points.lastOrNull()?.time ?: saved.startedAt
+            if (track == null) return
+            val end = recordedTimeline.durationMillis
             val position = playback.advance(SystemClock.elapsedRealtime(), end)
-            val duration = (end - saved.startedAt).coerceAtLeast(1)
-            timeline.progress = ((position - saved.startedAt).toDouble() / duration * TrackTimeline.STEPS).toInt().coerceIn(0, TrackTimeline.STEPS)
+            timeline.progress = (position.toDouble() / end.coerceAtLeast(1) * TrackTimeline.STEPS).toInt().coerceIn(0, TrackTimeline.STEPS)
             if (position >= end) { playing = false; updatePlay() } else playHandler.postDelayed(this, 200)
         }
     }
@@ -222,9 +222,7 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         if (playing) {
             follow = false
             if (timeline.progress == timeline.max) timeline.progress = 0
-            val start = track?.startedAt ?: 0
-            val end = track?.endedAt ?: points.lastOrNull()?.time ?: start
-            playback.start(start + ((end - start) * timeline.progress.toDouble() / timeline.max).toLong(), SystemClock.elapsedRealtime())
+            playback.start(recordedTimeline.positionForProgress(timeline.progress), SystemClock.elapsedRealtime())
             playHandler.postDelayed(player, 200)
         }
     }
@@ -237,6 +235,7 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         if (changedPoints) {
             if (changed) { playing = false; updatePlay() }
             points = loaded.routePoints
+            recordedTimeline = TrackTimeline(points)
             shownId = loaded.fileName
             route.points = TrackVisuals.displayPoints(points)
             route.solid = context.getColorEx(R.color.accent)
@@ -251,7 +250,7 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             }
             if (follow) timeline.progress = timeline.max
         }
-        timeline.isEnabled = points.isNotEmpty(); play.isEnabled = points.size > 1
+        timeline.isEnabled = points.size > 1; play.isEnabled = recordedTimeline.durationMillis > 0
         updateLegend()
         if (points.isEmpty()) {
             selectedText.setText(R.string.track_no_points)
@@ -267,9 +266,8 @@ class TrackMapPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         }
     }
     private fun selectPoint(center: Boolean) {
-        val saved = track ?: return
-        val end = saved.endedAt ?: points.lastOrNull()?.time ?: saved.startedAt
-        val selection = TrackTimeline.select(points, timeline.progress, saved.startedAt, end) ?: run {
+        if (track == null) return
+        val selection = recordedTimeline.select(timeline.progress) ?: run {
             selectedText.setText(R.string.track_no_points)
             cursor.isEnabled = false; timeline.contentDescription = context.getString(R.string.track_no_points); return
         }

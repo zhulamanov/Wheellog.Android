@@ -4,7 +4,9 @@ import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.view.ContextThemeWrapper
 import android.widget.TextView
 import androidx.core.graphics.ColorUtils
@@ -40,11 +42,35 @@ class StatsAppearanceTest {
             assertTrue(ColorUtils.calculateContrast(context.statsTextColor(), context.statsBackgroundColor()) >= 4.5)
             val marker = marker(context)
             marker.refreshContent(Entry(10f, 58.92f), Highlight(10f, 58.92f, 0))
-            val background = (marker.background as GradientDrawable).color!!.defaultColor
             for (id in listOf(R.id.textView_Title, R.id.textView_Data)) {
-                assertTrue(ColorUtils.calculateContrast(marker.findViewById<TextView>(id).currentTextColor, background) >= 4.5)
+                val text = marker.findViewById<TextView>(id)
+                assertTrue(ColorUtils.calculateContrast(text.currentTextColor, actualBackground(text)) >= 4.5)
             }
         }
+    }
+
+    private fun actualBackground(view: View): Int {
+        val color = when (val background = view.background) {
+            is ColorDrawable -> background.color
+            is GradientDrawable -> background.color?.defaultColor
+            else -> null
+        }
+        if (color != null && Color.alpha(color) == 255) return color
+        return actualBackground(view.parent as View)
+    }
+
+    @Test fun `split series show one popup row per metric and find the selected later session`() {
+        val context = contexts().first()
+        val morning = LineDataSet(listOf(Entry(10f, 20f)), "PWM")
+        val lunch = LineDataSet(listOf(Entry(50f, 82.29f)), "PWM")
+        val marker = ChartMarkerView(context, object : ValueFormatter() {}, listOf(morning, lunch))
+        marker.refreshContent(Entry(50f, 82.29f), Highlight(50f, 82.29f, 1))
+        val text = marker.findViewById<TextView>(R.id.textView_Data).text.toString()
+        assertEquals(1, Regex("PWM").findAll(text).count())
+        assertTrue(text.contains("82"))
+        assertFalse(text.contains("20"))
+        marker.refreshContent(Entry(30f, 0f), Highlight(30f, 0f, 0))
+        assertTrue(marker.findViewById<TextView>(R.id.textView_Data).text.toString().contains("PWM: —"))
     }
 
     @Test fun `all seven metric lines are visible in both built in themes`() {

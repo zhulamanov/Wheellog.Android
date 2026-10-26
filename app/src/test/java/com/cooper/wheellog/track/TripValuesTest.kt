@@ -24,12 +24,27 @@ class TripValuesTest {
         assertEquals(100.0, values.wheelMaximum!!, .001)
     }
 
-    @Test fun `old GPS only files include the full trip span while moving average excludes gaps`() {
+    @Test fun `older files count recorded intervals without adding the gap between sessions`() {
         val csv = read(row(0, 10f), row(1_000, 10f), row(1_000, 10f), row(600_000, 20f, segment = true), row(601_000, 20f))
         val values = TripValues.calculate(csv)
-        assertEquals(108.0 / 601.0, values.gpsAverage!!, .001)
+        assertEquals(54.0, values.gpsAverage!!, .001)
         assertEquals(54.0, values.gpsMovingAverage!!, .001)
         assertEquals(2.0, values.movingSeconds!!, .001)
+    }
+
+    @Test fun `daily GPS and corrected wheel maxima cover all sessions while real recorded stops still count`() {
+        val corrected = wheel(69.372).copy(rawSpeedKmh = 73.8, correctionPercent = -6)
+        val ticks = read(row(0, 21.5f, null), row(1_000, 21.5f, null),
+            row(4 * 3_600_000, 19f, corrected, segment = true),
+            row(4 * 3_600_000 + 1_000, 19f, corrected),
+            row(4 * 3_600_000 + 2_000, 0f, wheel(0.0)),
+            row(4 * 3_600_000 + 3_000, 0f, wheel(0.0)))
+        val values = TripValues.calculate(ticks)
+        assertEquals(77.4, values.gpsMaximum!!, .001)
+        assertEquals(69.372, values.wheelMaximum!!, .001)
+        assertEquals(44.999999, values.gpsAverage!!, .001)
+        assertEquals(60.0, values.gpsMovingAverage!!, .001)
+        assertEquals(4.0, com.cooper.wheellog.data.TripRecordingTime.seconds(ticks), .001)
     }
 
     @Test fun `active recording clock excludes pauses but includes short stops without stationary coordinates`() {

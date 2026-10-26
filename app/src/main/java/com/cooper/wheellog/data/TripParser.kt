@@ -20,7 +20,7 @@ import java.util.Locale
 import org.json.JSONObject
 
 object TripParser: KoinComponent {
-    const val STATS_VERSION = 4
+    const val STATS_VERSION = 5
     private val dao: TripDao by inject()
     private val errors = ThreadLocal<String?>()
     private var lastErrorValue: String?
@@ -82,7 +82,7 @@ object TripParser: KoinComponent {
                 // use absolute timestamps, including precise midnight crossings.
                 duration = if (first.legacyStatistics) {
                     ((last.time - first.time) / 600.0).toInt().let { if (it < 0) it + 1440 else it }
-                } else ((last.timestampMillis - first.timestampMillis).coerceAtLeast(0) / 60_000).toInt()
+                } else (TripRecordingTime.seconds(resultList) / 60).toInt()
                 var timeToExclude = 0f
                 var beforeTime = first.time // 1/10 sec
                 var firstTotalDistance = 0
@@ -143,6 +143,7 @@ object TripParser: KoinComponent {
                     put("hasAverageSpeed", values.gpsMovingAverage != null || wheelTicks.isNotEmpty())
                     put("hasPwm", values.maxPwm != null)
                     put("hasEnergy", hasEnergy)
+                    put("activeDurationMinutes", (TripRecordingTime.seconds(resultList) / 60).toInt())
                     put("startedAt", first.timestampMillis)
                     put("endedAt", last.timestampMillis)
                 }.toString()

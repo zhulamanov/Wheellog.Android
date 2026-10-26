@@ -42,6 +42,12 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
             if (tripData != null) {
                 tripDataReceived(binding.chart1, tripData.stats1)
                 tripDataReceived(binding.chart2, tripData.stats2)
+                val end = (((tripData.endedAt ?: tripData.startedAt) - tripData.startedAt) / 100f).coerceAtLeast(1f)
+                for (chart in listOf(binding.chart1, binding.chart2)) {
+                    chart.xAxis.axisMinimum = 0f
+                    chart.xAxis.axisMaximum = end
+                    chart.invalidate()
+                }
                 binding.chart1.setOnChartValueSelectedListener(this)
                 binding.chart2.setOnChartValueSelectedListener(this)
             }
@@ -66,6 +72,14 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
                     addDataSet(it)
                 }
             }
+            legend.setCustom(stats.distinctBy { it.label }.map { series ->
+                com.github.mikephil.charting.components.LegendEntry().apply {
+                    label = series.label
+                    formColor = series.color
+                    form = com.github.mikephil.charting.components.Legend.LegendForm.SQUARE
+                }
+            })
+            axisRight.isEnabled = stats.any { it.axisDependency == com.github.mikephil.charting.components.YAxis.AxisDependency.RIGHT }
             marker = ChartMarkerView(requireContext(), chart.xAxis.valueFormatter, stats).apply { chartView = chart }
             invalidate()
         }
@@ -74,8 +88,9 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
     override fun onValueSelected(e: Entry?, h: Highlight?) {
         if (h == null) return
         for (chart in listOf(binding.chart1, binding.chart2)) {
-            val index = chart.data?.dataSets?.indexOfFirst { it.entryCount > 0 } ?: -1
+            val index = chart.data?.dataSets?.indexOfFirst { it.getEntriesForXValue(h.x).isNotEmpty() } ?: -1
             if (index >= 0) chart.highlightValues(arrayOf(Highlight(h.x, Float.NaN, index)))
+            else chart.highlightValues(emptyArray())
         }
     }
 

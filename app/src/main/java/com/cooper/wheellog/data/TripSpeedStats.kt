@@ -1,6 +1,16 @@
 package com.cooper.wheellog.data
 
 data class SpeedSample(val timeMillis: Long, val speedKmh: Double, val segmentStart: Boolean = false)
+
+/** Count recorded intervals, never the hours between separate recording sessions. */
+object TripRecordingTime {
+    fun seconds(ticks: List<LogTick>): Double = ticks.zipWithNext().sumOf { (before, after) ->
+        val a = before.recordingElapsedMillis
+        val b = after.recordingElapsedMillis
+        if (a != null && b != null) (b - a).coerceAtLeast(0) / 1000.0
+        else ((after.timestampMillis - before.timestampMillis) / 1000.0).takeIf { it > 0 && it <= 30 } ?: 0.0
+    }
+}
 data class TripSpeedStats(val maximum: Double, val movingAverage: Double, val movingSeconds: Double) {
     companion object {
         fun calculate(samples: List<SpeedSample>): TripSpeedStats {

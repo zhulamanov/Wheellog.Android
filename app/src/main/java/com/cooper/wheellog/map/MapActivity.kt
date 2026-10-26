@@ -138,71 +138,16 @@ class MapActivity : AppCompatActivity() {
             }
         }
 
-        val chart1DataSets = listOf(
-            LineDataSet(
-                list.filter { it.wheelDataAvailable }.map { Entry(it.timePlusDayOfWeek, it.batteryLevel.toFloat()) },
-                getString(R.string.battery)
-            ).apply {
-                color = statSeriesColor(R.color.stats_battery)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.LEFT
-                lineWidth = 2f
-            },
-            LineDataSet(
-                list.filter { it.wheelDataAvailable || it.gpsSpeedAvailable }.map { Entry(it.timePlusDayOfWeek, it.speed.toFloat()) },
-                getString(R.string.speed)
-            ).apply {
-                color = statSeriesColor(R.color.stats_speed)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.LEFT
-                lineWidth = 2f
-            },
-            LineDataSet(
-                list.filter { it.wheelDataAvailable }.map { Entry(it.timePlusDayOfWeek, it.temperature.toFloat()) },
-                getString(R.string.temperature)
-            ).apply {
-                color = statSeriesColor(R.color.stats_temp)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.RIGHT
-                lineWidth = 2f
-            })
-        val chart2DataSets = listOf(
-            LineDataSet(
-                list.filter { it.pwmAvailable }.map { Entry(it.timePlusDayOfWeek, it.pwm.toFloat()) },
-                getString(R.string.pwm)
-            ).apply {
-                color = statSeriesColor(R.color.stats_pwm)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.LEFT
-                lineWidth = 2f
-            },
-            LineDataSet(
-                list.filter { it.wheelDataAvailable }.map { Entry(it.timePlusDayOfWeek, it.voltage.toFloat()) },
-                getString(R.string.voltage)
-            ).apply {
-                color = statSeriesColor(R.color.stats_voltage)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.LEFT
-                lineWidth = 2f
-            },
-            LineDataSet(
-                list.filter { it.wheelDataAvailable }.map { Entry(it.timePlusDayOfWeek, it.power.toFloat()) },
-                getString(R.string.power)
-            ).apply {
-                color = statSeriesColor(R.color.stats_power)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.RIGHT
-                lineWidth = 2f
-            },
-            LineDataSet(
-                list.filter { it.wheelDataAvailable }.map { Entry(it.timePlusDayOfWeek, it.current.toFloat()) },
-                getString(R.string.current)
-            ).apply {
-                color = statSeriesColor(R.color.stats_current)
-                setDrawCircles(false)
-                axisDependency = YAxis.AxisDependency.LEFT
-                lineWidth = 2f
-            })
+        fun series(title: Int, metric: Int, right: Boolean = false, wheelOnly: Boolean = true,
+                   reading: (com.cooper.wheellog.data.LogTick) -> Double?) = statsSeries(list, getString(title),
+            statSeriesColor(metric), if (right) YAxis.AxisDependency.RIGHT else YAxis.AxisDependency.LEFT, wheelOnly, reading)
+        val chart1DataSets = series(R.string.battery, R.color.stats_battery) { if (it.wheelDataAvailable) it.batteryLevel.toDouble() else null } +
+            series(R.string.speed, R.color.stats_speed, wheelOnly = false) { if (it.wheelDataAvailable || it.gpsSpeedAvailable) it.speed else null } +
+            series(R.string.temperature, R.color.stats_temp, right = true) { if (it.wheelDataAvailable) it.availableTemperature else null }
+        val chart2DataSets = series(R.string.pwm, R.color.stats_pwm) { if (it.pwmAvailable) it.pwm else null } +
+            series(R.string.voltage, R.color.stats_voltage) { if (it.wheelDataAvailable) it.availableVoltage else null } +
+            series(R.string.power, R.color.stats_power, right = true) { if (it.wheelDataAvailable) it.availablePower else null } +
+            series(R.string.current, R.color.stats_current) { if (it.wheelDataAvailable) it.availableCurrent else null }
 
         return tripData.copy(
             geoLine = geoLine,

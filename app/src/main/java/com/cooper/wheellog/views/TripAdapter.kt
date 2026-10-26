@@ -207,7 +207,7 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
             bind(itemBinding.metricGpsSpeed, "📡", speed(metric(trip?.maxSpeedGps, "hasGpsSpeed")), "$speedUnit · GPS")
             bind(itemBinding.metricAverage, "♿", speed(metric(trip?.avgSpeed, "hasAverageSpeed")), "$speedUnit · " + context.getString(R.string.trip_metric_average))
             bind(itemBinding.metricPwm, "😱", number(metric(trip?.maxPwm, "hasPwm")), "% · PWM")
-            bind(itemBinding.metricDuration, "⌚", trip?.duration?.toString() ?: "—", context.getString(R.string.min))
+            bind(itemBinding.metricDuration, "⌚", trip?.let { available.optInt("activeDurationMinutes", it.duration).toString() } ?: "—", context.getString(R.string.min))
             bind(itemBinding.metricDistance, "📏", speed(trip?.distance?.div(1000f)), distanceUnit)
             bind(itemBinding.metricEnergy, "⚡", number(metric(trip?.consumptionTotal, "hasEnergy")), context.getString(R.string.wh))
             val consumption = trip?.consumptionByKm?.let { if (appConfig.useMph) it / kmToMilesMultiplier.toFloat() else it }

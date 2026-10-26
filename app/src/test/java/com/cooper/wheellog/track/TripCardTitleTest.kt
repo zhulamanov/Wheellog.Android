@@ -73,7 +73,7 @@ class TripCardTitleTest {
 
     private fun bind(context: Context, file: String): Pair<String, TripModel> {
         val lookedUp = CountDownLatch(1)
-        val record = TripDataDbEntry(fileName = file, duration = 10, additionalJson = "{\"tripStatsVersion\":4}")
+        val record = TripDataDbEntry(fileName = file, duration = 10, additionalJson = "{\"tripStatsVersion\":${com.cooper.wheellog.data.TripParser.STATS_VERSION}}")
         every { dao.getTripByFileName(file) } answers { lookedUp.countDown(); record }
         val binding = ListTripItemBinding.inflate(LayoutInflater.from(context))
         val holder = TripAdapter.ViewHolder(binding, Typeface.DEFAULT)

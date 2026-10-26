@@ -1,7 +1,8 @@
 # Native CSV trips and route viewing
 
 The existing WheelLog CSV format and Trips page remain the source of trip data.
-Historical CSV duration, energy and distance summaries retain upstream behavior;
+Historical stored CSV summaries retain upstream behavior; the card duration uses
+recorded intervals rather than counting hours with no samples as recording time.
 extended logs use absolute timestamps for accurate midnight crossings.
 The main-toolbar recording button opens Start, Pause and Stop commands and
 disables commands that do not apply. Manual Start does not use the automatic
@@ -46,7 +47,9 @@ Overall GPS average includes stationary recording time. New files append an opti
 recording_elapsed_ms clock that excludes manual and automatic pauses; filtered stationary
 coordinates are not required. A final timing-only row can retain a short final stop without
 inventing sensor data or a map point. Older files lack pause timing, so their overall
-average uses the recorded wall-clock span and cannot distinguish old pauses from stops.
+average counts consecutive recorded intervals up to 30 seconds rather than including
+unrecorded gaps. Actual recorded zero-speed samples still count as stationary time.
+Stops without any samples or recording clock cannot be reconstructed from an old file.
 Continuing an older file preserves its original header and column layout.
 Missing optional telemetry is shown as an em dash; a recorded zero remains zero.
 Speeds are presented in km/h and temperatures in Celsius on this summary screen.
@@ -60,5 +63,13 @@ Fresh decoded wheel packets feed the CSV writer directly, independently of UI br
 and cached BluetoothService state. Disconnects invalidate the cached sample; old decoded
 timestamps are rejected. GPS-only files cannot supply wheel maxima, PWM or consumption:
 cards display a dash rather than labeling GPS speed as wheel speed or substituting zero.
-CSV summaries use availability metadata and are refreshed from version4 caches.
+CSV summaries use availability metadata and are refreshed from version5 caches.
 Extended-file energy integrates available power over valid short intervals only.
+
+All recorded parts of a daily file contribute to their own GPS and wheel maxima;
+missing wheel telemetry is never replaced by a GPS maximum. Graphs separate line
+segments across missing intervals and share a real-time horizontal range. Their
+legends and popup labels list each metric once. Replay skips intervals without a
+recorded route while preserving original timestamps within the recorded segments.
+Marker content uses a transparent inner layout so the themed marker surface remains
+visible and text contrast is evaluated against the actual surface behind each label.

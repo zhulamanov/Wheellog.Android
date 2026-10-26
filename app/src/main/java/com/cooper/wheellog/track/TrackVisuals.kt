@@ -58,21 +58,32 @@ class TrackPlayback {
 }
 
 data class TrackTimeSelection(val index: Int, val requestedTime: Long, val inGap: Boolean)
-object TrackTimeline {
-    const val STEPS = 10_000
-    fun select(points: List<TrackPoint>, progress: Int, start: Long, end: Long): TrackTimeSelection? {
+/** The slider covers recorded route intervals; missing hours have no replay duration. */
+class TrackTimeline(private val points: List<TrackPoint>) {
+    companion object { const val STEPS = 10_000 }
+    private val offsets = LongArray(points.size)
+    init {
+        for (index in 1 until points.size) {
+            val dt = points[index].time - points[index - 1].time
+            offsets[index] = offsets[index - 1] + if (!points[index].segmentStart && dt in 1..30_000) dt else 0L
+        }
+    }
+    val durationMillis: Long get() = offsets.lastOrNull() ?: 0L
+    fun positionForProgress(progress: Int): Long = (durationMillis * (progress.coerceIn(0, STEPS) / STEPS.toDouble())).toLong()
+    fun select(progress: Int): TrackTimeSelection? {
         if (points.isEmpty()) return null
-        val time = start + ((end - start).coerceAtLeast(0) * (progress.coerceIn(0, STEPS) / STEPS.toDouble())).toLong()
+        if (durationMillis == 0L) {
+            val index = ((points.lastIndex * progress.coerceIn(0, STEPS).toLong()) / STEPS).toInt()
+            return TrackTimeSelection(index, points[index].time, false)
+        }
+        val position = positionForProgress(progress)
         var low = 0
         var high = points.lastIndex
         while (low < high) {
             val middle = (low + high + 1) / 2
-            if (points[middle].time <= time) low = middle else high = middle - 1
+            if (offsets[middle] <= position) low = middle else high = middle - 1
         }
-        val next = points.getOrNull(low + 1)
-        val gap = time < points.first().time || (time > points[low].time + 15_000 &&
-            (next == null || next.segmentStart || next.time - points[low].time > 30_000))
-        return TrackTimeSelection(low, time, gap)
+        return TrackTimeSelection(low, points[low].time + position - offsets[low], false)
     }
 }
 
