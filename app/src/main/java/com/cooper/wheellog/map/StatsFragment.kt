@@ -55,34 +55,7 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
     }
 
     private fun initChart(chart: LineChart) {
-        chart.apply {
-            setDrawGridBackground(false)
-            description.isEnabled = false
-            setHardwareAccelerationEnabled(true)
-            setBackgroundColor(context.statsBackgroundColor())
-            legend.textColor = context.statsTextColor()
-            legend.textSize = 12f
-            legend.isWordWrapEnabled = true
-            setNoDataText(resources.getString(R.string.no_chart_data))
-            setNoDataTextColor(context.statsTextColor())
-            axisLeft.apply {
-                setDrawGridLines(false)
-                textColor = chart.context.statsTextColor()
-                textSize = 12f
-                axisMinimum = 0f
-            }
-            axisRight.apply {
-                setDrawGridLines(false)
-                textColor = chart.context.statsTextColor()
-                textSize = 12f
-            }
-            xAxis.apply {
-                position = XAxis.XAxisPosition.BOTTOM
-                textColor = chart.context.statsTextColor()
-                textSize = 12f
-                valueFormatter = chartAxisValueFormatter
-            }
-        }
+        styleStatsChart(chart, chartAxisValueFormatter)
     }
 
     private fun tripDataReceived(chart: LineChart, stats: List<LineDataSet>) {
@@ -109,5 +82,41 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
     override fun onNothingSelected() {
         binding.chart1.highlightValues(arrayOf())
         binding.chart2.highlightValues(arrayOf())
+    }
+}
+
+/** Shared with the chart appearance checks so they inspect the actual label configuration. */
+internal fun styleStatsChart(chart: LineChart, timeFormatter: ValueFormatter) {
+    chart.apply {
+        setDrawGridBackground(false)
+        description.isEnabled = false
+        setHardwareAccelerationEnabled(true)
+        setBackgroundColor(context.statsBackgroundColor())
+        legend.textColor = context.statsTextColor()
+        legend.textSize = 13f
+        legend.isWordWrapEnabled = true
+        setNoDataText(context.getString(R.string.no_chart_data))
+        setNoDataTextColor(context.statsTextColor())
+        getPaint(com.github.mikephil.charting.charts.Chart.PAINT_INFO).textSize =
+            android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 14f, resources.displayMetrics)
+        axisLeft.apply {
+            setDrawGridLines(false)
+            textColor = chart.context.statsTextColor()
+            textSize = 13f
+            axisMinimum = 0f
+        }
+        axisRight.apply {
+            setDrawGridLines(false)
+            textColor = chart.context.statsTextColor()
+            textSize = 13f
+        }
+        xAxis.apply {
+            position = XAxis.XAxisPosition.BOTTOM
+            textColor = chart.context.statsTextColor()
+            textSize = 13f
+            valueFormatter = timeFormatter
+            setLabelCount(4, true)
+            setAvoidFirstLastClipping(true)
+        }
     }
 }

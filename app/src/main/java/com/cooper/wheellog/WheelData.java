@@ -1099,6 +1099,8 @@ public class WheelData {
         updateVoltageSag();
         setMaxTemp(mTemperature);
 
+        LoggingService.onWheelDataDecoded(this);
+
         Intent intent = new Intent(Constants.ACTION_WHEEL_DATA_AVAILABLE);
 
         if (graph_last_update_time + GRAPH_UPDATE_INTERVAL < Calendar.getInstance().getTimeInMillis()) {
@@ -1218,6 +1220,9 @@ public class WheelData {
         mTotalDistance = 0;
         mCurrent = 0;
         mPower = 0;
+        mMaxCurrent = 0;
+        mMaxPhaseCurrent = 0;
+        mMaxPower = 0;
         mTemperature = 0;
         mTemperature2 = 0;
         mCpuLoad = 0;
@@ -1253,6 +1258,7 @@ public class WheelData {
         protoVer = "";
         mWheelAlarm = false;
         mWheelIsReady = false;
+        mLastLifeData = -1;
     }
 
     boolean detectWheel(String deviceAddress, Context mContext, int servicesResId) {

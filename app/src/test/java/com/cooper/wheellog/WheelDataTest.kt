@@ -110,4 +110,41 @@ class WheelDataTest: KoinTest {
         assertThat(data.currentDouble).isEqualTo(0.75)
         assertThat(data.maxCurrentDouble).isEqualTo(1)
     }
+
+    @Test fun `new session resets current and power peaks along with other readings`() {
+        data.current = 7_120
+        data.phaseCurrent = 12_000
+        data.setPower(933_200)
+        assertThat(data.maxCurrentDouble).isGreaterThan(0.0)
+        assertThat(data.maxPowerDouble).isGreaterThan(0.0)
+        data.reset()
+        assertThat(data.maxCurrentDouble).isEqualTo(0.0)
+        assertThat(data.maxPhaseCurrentDouble).isEqualTo(0.0)
+        assertThat(data.maxPowerDouble).isEqualTo(0.0)
+        data.current = 100
+        data.setPower(200)
+        assertThat(data.maxCurrentDouble).isEqualTo(1.0)
+        assertThat(data.maxPowerDouble).isEqualTo(2.0)
+    }
+
+    @Test fun `minus six percent correction preserves GPS PWM and non speed telemetry in CSV`() {
+        every { appConfig.appliedSpeedCorrectionPercent } returns -6
+        data.speed = 10_000
+        data.voltage = 14_000
+        data.current = 1_000
+        data.setPower(140_000)
+        data.output = 6_800
+        data.updatePwm()
+        val sample = com.cooper.wheellog.data.NativeWheelSample.capture(data, 0, "")
+        val gps = com.cooper.wheellog.track.TrackPoint(1_700_000_000_000L, 50.0, 10.0, null, 5f, 20f)
+        val cells = com.cooper.wheellog.data.NativeCsv.HEADER.split(',').zip(
+            com.cooper.wheellog.data.NativeCsv.row(gps.time, gps, sample, 0.0, true).split(',')).toMap()
+        assertThat(cells.getValue("speed").toDouble()).isEqualTo(94.0)
+        assertThat(cells.getValue("wheel_speed_raw").toDouble()).isEqualTo(100.0)
+        assertThat(cells.getValue("gps_speed").toDouble()).isEqualTo(72.0)
+        assertThat(cells.getValue("pwm").toDouble()).isEqualTo(data.calculatedPwm)
+        assertThat(cells.getValue("voltage").toDouble()).isEqualTo(140.0)
+        assertThat(cells.getValue("current").toDouble()).isEqualTo(10.0)
+        assertThat(cells.getValue("power").toDouble()).isEqualTo(1400.0)
+    }
 }

@@ -10,15 +10,23 @@ import java.util.Locale
 
 /** Original CSV columns remain first; optional trailing columns preserve GPS fixes and gaps. */
 object NativeCsv {
-    const val HEADER = "date,time,latitude,longitude,gps_speed,gps_alt,gps_heading,gps_distance,speed,voltage,phase_current,current,power,torque,pwm,battery_level,distance,totaldistance,system_temp,temp2,tilt,roll,mode,alert,gps_time,gps_accuracy,track_segment,wheel_speed_raw,speed_correction_percent"
-    fun row(time: Long, gps: TrackPoint?, wheel: NativeWheelSample?, meters: Double, segment: Boolean): String {
+    const val HEADER = "date,time,latitude,longitude,gps_speed,gps_alt,gps_heading,gps_distance,speed,voltage,phase_current,current,power,torque,pwm,battery_level,distance,totaldistance,system_temp,temp2,tilt,roll,mode,alert,gps_time,gps_accuracy,track_segment,wheel_speed_raw,speed_correction_percent,recording_elapsed_ms"
+    fun row(time: Long, gps: TrackPoint?, wheel: NativeWheelSample?, meters: Double, segment: Boolean,
+            recordingElapsedMillis: Long? = null): String {
         val date = SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS", Locale.US).format(Date(time))
         val position = listOf(gps?.latitude, gps?.longitude, gps?.speedMps?.times(3.6), gps?.altitude,
             null, meters.takeIf { gps != null }).map { it?.toString() ?: "" }
         return date + "," + (position + (wheel?.columns ?: List(16) { "" }) + listOf(
             gps?.time?.toString() ?: "", gps?.accuracy?.toString() ?: "", if (segment) "1" else "0",
-            wheel?.rawSpeedKmh?.toString() ?: "", wheel?.correctionPercent?.toString() ?: ""
+            wheel?.rawSpeedKmh?.toString() ?: "", wheel?.correctionPercent?.toString() ?: "",
+            recordingElapsedMillis?.toString() ?: ""
         )).joinToString(",") { it.replace(',', ';').replace('\n', ' ').replace('\r', ' ') }
+    }
+
+    /** Continuing a file after an update must preserve that file's original column shape. */
+    fun alignRow(row: String, columns: List<String>): String {
+        val values = HEADER.split(',').zip(row.split(',')).toMap()
+        return columns.joinToString(",") { values[it] ?: "" }
     }
 
     fun read(input: InputStream): List<LogTick> = input.bufferedReader().use { reader ->
@@ -58,7 +66,8 @@ object NativeCsv {
                 availableCurrent = cell("current").toDoubleOrNull()?.takeIf { it.isFinite() },
                 availableVoltage = cell("voltage").toDoubleOrNull()?.takeIf { it.isFinite() },
                 availableTemperature = cell("system_temp").toDoubleOrNull()?.takeIf { it.isFinite() },
-                gpsSpeedAvailable = cell("gps_speed").toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true))
+                gpsSpeedAvailable = cell("gps_speed").toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true,
+                recordingElapsedMillis = cell("recording_elapsed_ms").toLongOrNull()?.takeIf { it >= 0 }))
         }
         result
     }

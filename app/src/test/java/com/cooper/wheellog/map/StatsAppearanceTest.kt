@@ -54,6 +54,24 @@ class StatsAppearanceTest {
         }
     }
 
+    @Test fun `actual chart axes legend and empty message are neutral and readable in all themes`() {
+        for (context in contexts()) {
+            val chart = LineChart(context)
+            styleStatsChart(chart, object : ValueFormatter() { override fun getFormattedValue(value: Float) = "12:34:56" })
+            val foregrounds = listOf(chart.axisLeft.textColor, chart.axisRight.textColor,
+                chart.xAxis.textColor, chart.legend.textColor,
+                chart.getPaint(com.github.mikephil.charting.charts.Chart.PAINT_INFO).color)
+            foregrounds.forEach { color ->
+                assertEquals(Color.red(color), Color.green(color))
+                assertEquals(Color.green(color), Color.blue(color))
+                assertTrue(ColorUtils.calculateContrast(color, context.statsBackgroundColor()) >= 4.5)
+            }
+            assertTrue(chart.xAxis.labelCount <= 4)
+            assertTrue(chart.xAxis.isAvoidFirstLastClippingEnabled)
+            assertTrue(chart.xAxis.textSize >= 13f)
+        }
+    }
+
     @Test fun `missing readings are not displayed as zero and labels remain literal`() {
         val marker = marker(contexts().first())
         marker.refreshContent(Entry(10f, 0f), Highlight(10f, 0f, 0))

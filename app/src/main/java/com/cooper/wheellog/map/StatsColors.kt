@@ -36,7 +36,9 @@ fun Context.statsBackgroundColor() = statsThemeColor(android.R.attr.colorBackgro
 fun Context.statsMarkerBackgroundColor() = statsBackgroundColor()
 fun Context.statsTextColor(): Int {
     val background = statsBackgroundColor()
-    val preferred = ColorUtils.compositeColors(statsThemeColor(android.R.attr.textColorPrimary), background)
+    // Small axis labels must stay neutral, even when dashboard digits use a saturated accent.
+    val preferred = listOf(0xff202020.toInt(), 0xffececec.toInt())
+        .maxBy { ColorUtils.calculateContrast(it, background) }
     return readableStatsColor(preferred, background)
 }
 fun Context.statsMarkerTextColor() = statsTextColor()

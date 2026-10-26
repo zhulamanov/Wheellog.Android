@@ -20,6 +20,28 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [29])
 class TripParserTrackTest {
+    @Test fun `GPS only CSV never labels GPS maximum as wheel speed or missing energy as measured zero`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dao = mockk<TripDao>(relaxed = true)
+        val cached = com.cooper.wheellog.data.TripDataDbEntry(fileName = "gps-only.csv", maxSpeed = 99f, maxPwm = 90f)
+        every { dao.getTripByFileName(any()) } returns cached
+        startKoin { modules(module { single { dao } }) }
+        try {
+            val time = 1_700_000_000_000L
+            fun row(t: Long) = com.cooper.wheellog.data.NativeCsv.row(t,
+                TrackPoint(t, 50.0, 10.0, null, 5f, 20f), null, 1000.0, false)
+            val csv = com.cooper.wheellog.data.NativeCsv.HEADER + "\n" + row(time) + "\n" + row(time + 1_000)
+            val trip = TripParser.parseFile(context, cached.fileName, csv.byteInputStream()).second!!
+            assertEquals(0f, trip.maxSpeed)
+            assertEquals(72f, trip.maxSpeedGps, .001f)
+            val availability = JSONObject(trip.additionalJson!!)
+            assertFalse(availability.getBoolean("hasWheelSpeed"))
+            assertFalse(availability.getBoolean("hasPwm"))
+            assertFalse(availability.getBoolean("hasEnergy"))
+            assertTrue(availability.getBoolean("hasGpsSpeed"))
+        } finally { stopKoin() }
+    }
+
     @Test fun `trip tiles get maximum moving average and real times across midnight even without GPS`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dao = mockk<TripDao>(relaxed = true)
@@ -41,7 +63,7 @@ class TripParserTrackTest {
             assertEquals(25.0, data.getDouble("movingAverageSpeed"), 0.001)
             assertEquals(303_000L, data.getLong("endedAt") - data.getLong("startedAt"))
             assertEquals(5, trip.duration)
-            assertEquals(3, data.getInt("tripStatsVersion"))
+            assertEquals(TripParser.STATS_VERSION, data.getInt("tripStatsVersion"))
         } finally { stopKoin() }
     }
 }

@@ -11,8 +11,8 @@ class TripValuesTest {
     private fun wheel(speed: Double = 100.0, voltage: String = "149", phase: String = "25", motor: String = "60") =
         NativeWheelSample(listOf("$speed", voltage, phase, "15", "2000", "0", "58.92", "97", "100", "10000", "33", motor, "0", "0", "", ""),
             TrackTelemetry(speed, 97, 149.0, 33, 58.92))
-    private fun row(offset: Long, speedMps: Float, sample: NativeWheelSample? = wheel(), segment: Boolean = false) =
-        NativeCsv.row(start + offset, TrackPoint(start + offset, 56.8 + offset / 1e9, 60.6, 200.0, 5f, speedMps, segment), sample, 0.0, segment)
+    private fun row(offset: Long, speedMps: Float, sample: NativeWheelSample? = wheel(), segment: Boolean = false, elapsed: Long? = null) =
+        NativeCsv.row(start + offset, TrackPoint(start + offset, 56.8 + offset / 1e9, 60.6, 200.0, 5f, speedMps, segment), sample, 0.0, segment, elapsed)
     private fun read(vararg rows: String) = NativeCsv.read((NativeCsv.HEADER + "\n" + rows.joinToString("\n")).byteInputStream())
 
     @Test fun `GPS averages are time weighted exclude standing only for moving average and never use wheel speed`() {
@@ -24,12 +24,42 @@ class TripValuesTest {
         assertEquals(100.0, values.wheelMaximum!!, .001)
     }
 
-    @Test fun `GPS gaps pauses and duplicate fixes cannot inflate averaging time`() {
+    @Test fun `old GPS only files include the full trip span while moving average excludes gaps`() {
         val csv = read(row(0, 10f), row(1_000, 10f), row(1_000, 10f), row(600_000, 20f, segment = true), row(601_000, 20f))
         val values = TripValues.calculate(csv)
-        assertEquals(54.0, values.gpsAverage!!, .001)
+        assertEquals(108.0 / 601.0, values.gpsAverage!!, .001)
         assertEquals(54.0, values.gpsMovingAverage!!, .001)
         assertEquals(2.0, values.movingSeconds!!, .001)
+    }
+
+    @Test fun `active recording clock excludes pauses but includes short stops without stationary coordinates`() {
+        val values = TripValues.calculate(read(row(0, 10f, elapsed = 0), row(1_000, 10f, elapsed = 1_000),
+            row(600_000, 20f, segment = true, elapsed = 11_000), row(601_000, 20f, elapsed = 12_000)))
+        assertEquals(9.0, values.gpsAverage!!, .001)
+        assertEquals(54.0, values.gpsMovingAverage!!, .001)
+        assertEquals(2.0, values.movingSeconds!!, .001)
+    }
+
+    @Test fun `timing only final row counts a final stop without creating GPS points or sensor values`() {
+        val ending = NativeCsv.row(start + 11_000, null, null, 0.0, false, 11_000)
+        val ticks = read(row(0, 10f, sample = null, elapsed = 0), row(1_000, 10f, sample = null, elapsed = 1_000), ending)
+        assertEquals(2, NativeCsv.points(ticks).size)
+        assertFalse(ticks.last().wheelDataAvailable)
+        assertFalse(ticks.last().gpsSpeedAvailable)
+        val values = TripValues.calculate(ticks)
+        assertEquals(36.0 / 11, values.gpsAverage!!, .001)
+        assertEquals(36.0, values.gpsMovingAverage!!, .001)
+        assertNull(values.maxPower)
+    }
+
+    @Test fun `continued older CSV keeps its column layout without changing recorded values`() {
+        val headers = NativeCsv.HEADER.split(',').dropLast(1)
+        val aligned = NativeCsv.alignRow(row(0, 10f, elapsed = 500), headers)
+        assertEquals(headers.size, aligned.split(',').size)
+        val ticks = NativeCsv.read((headers.joinToString(",") + "\n" + aligned).byteInputStream())
+        assertNull(ticks.single().recordingElapsedMillis)
+        assertEquals(36.0, ticks.single().speedGps, .001)
+        assertEquals(58.92, ticks.single().pwm, .001)
     }
 
     @Test fun `phase motor and voltage summaries come from recorded telemetry`() {

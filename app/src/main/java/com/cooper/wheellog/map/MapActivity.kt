@@ -149,7 +149,7 @@ class MapActivity : AppCompatActivity() {
                 lineWidth = 2f
             },
             LineDataSet(
-                list.map { Entry(it.timePlusDayOfWeek, it.speed.toFloat()) },
+                list.filter { it.wheelDataAvailable || it.gpsSpeedAvailable }.map { Entry(it.timePlusDayOfWeek, it.speed.toFloat()) },
                 getString(R.string.speed)
             ).apply {
                 color = statSeriesColor(R.color.stats_speed)

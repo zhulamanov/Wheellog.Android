@@ -41,7 +41,13 @@ absence of a Trips page heading are retained.
 Values contains GPS maximum, time-weighted average and moving average speed; wheel
 maximum speed; maximum PWM, power, current and phase current; minimum voltage;
 moving time; distance in kilometres; and maximum board and motor temperatures.
-GPS averages use available GPS samples and skip recording gaps and segment boundaries.
+GPS moving averages use available GPS samples and skip gaps and segment boundaries.
+Overall GPS average includes stationary recording time. New files append an optional
+recording_elapsed_ms clock that excludes manual and automatic pauses; filtered stationary
+coordinates are not required. A final timing-only row can retain a short final stop without
+inventing sensor data or a map point. Older files lack pause timing, so their overall
+average uses the recorded wall-clock span and cannot distinguish old pauses from stops.
+Continuing an older file preserves its original header and column layout.
 Missing optional telemetry is shown as an em dash; a recorded zero remains zero.
 Speeds are presented in km/h and temperatures in Celsius on this summary screen.
 
@@ -49,3 +55,10 @@ With same-day continuation enabled, morning Stop closes the morning session. Lun
 Start opens a new CSV. After a normal exit, an evening Start for the same wheel
 continues the lunch CSV until Stop is pressed again. NativeTrackRecordingTest covers
 this complete sequence without modifying the finished morning file.
+
+Fresh decoded wheel packets feed the CSV writer directly, independently of UI broadcasts
+and cached BluetoothService state. Disconnects invalidate the cached sample; old decoded
+timestamps are rejected. GPS-only files cannot supply wheel maxima, PWM or consumption:
+cards display a dash rather than labeling GPS speed as wheel speed or substituting zero.
+CSV summaries use availability metadata and are refreshed from version4 caches.
+Extended-file energy integrates available power over valid short intervals only.

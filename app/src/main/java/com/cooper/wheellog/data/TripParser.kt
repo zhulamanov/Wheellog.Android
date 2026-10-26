@@ -20,6 +20,7 @@ import java.util.Locale
 import org.json.JSONObject
 
 object TripParser: KoinComponent {
+    const val STATS_VERSION = 4
     private val dao: TripDao by inject()
     private val errors = ThreadLocal<String?>()
     private var lastErrorValue: String?
@@ -85,6 +86,9 @@ object TripParser: KoinComponent {
                 var timeToExclude = 0f
                 var beforeTime = first.time // 1/10 sec
                 var firstTotalDistance = 0
+                maxSpeedGps = 0f
+                maxCurrent = 0f
+                maxPwm = 0f
 
                 resultList.forEach {
                     // If time between ticks more than 1 sec, we need to exclude this time
@@ -98,9 +102,9 @@ object TripParser: KoinComponent {
                     if (firstTotalDistance == 0 && it.totalDistance > 0) {
                         firstTotalDistance = it.totalDistance
                     }
-                    maxSpeedGps = maxSpeedGps.coerceAtLeast(it.speedGps.toFloat())
-                    maxCurrent = maxCurrent.coerceAtLeast(it.current.toFloat())
-                    maxPwm = maxPwm.coerceAtLeast(it.pwm.toFloat())
+                    if (it.gpsSpeedAvailable) maxSpeedGps = maxSpeedGps.coerceAtLeast(it.speedGps.toFloat())
+                    if (it.wheelDataAvailable) maxCurrent = maxCurrent.coerceAtLeast(it.current.toFloat())
+                    if (it.pwmAvailable) maxPwm = maxPwm.coerceAtLeast(it.pwm.toFloat())
                 }
 
                 val maxTotalDistance = resultList.subList(0.coerceAtLeast(resultList.size - 10), resultList.size).maxOf { it.totalDistance }
@@ -111,19 +115,38 @@ object TripParser: KoinComponent {
                 distance = if (first.legacyStatistics) maxTotalDistance - firstTotalDistance else
                     maxOf(maxTotalDistance - firstTotalDistance, com.cooper.wheellog.track.summarizeTrack(NativeCsv.points(resultList)).distanceMeters.toInt()).coerceAtLeast(0)
                 val powers = resultList.map { it.power }
-                maxPower = powers.max().toFloat()
-                val speeds = resultList.map { it.speed }
-                maxSpeed = speeds.max().toFloat()
-                avgSpeed = speeds.average().toFloat()
-                val moving = TripSpeedStats.calculate(resultList.map { SpeedSample(it.timestampMillis, it.speed) })
+                val wheelTicks = resultList.filter { it.wheelDataAvailable }
+                maxPower = wheelTicks.mapNotNull { it.availablePower }.maxOrNull()?.toFloat() ?: 0f
+                maxSpeed = wheelTicks.maxOfOrNull { it.speed }?.toFloat() ?: 0f
+                val moving = TripSpeedStats.calculate(wheelTicks.map { SpeedSample(it.timestampMillis, it.speed, it.segmentStart) })
+                val values = TripValues.calculate(resultList)
+                avgSpeed = if (first.legacyStatistics) resultList.map { it.speed }.average().toFloat()
+                    else (values.gpsMovingAverage ?: moving.movingAverage).toFloat()
+                var energyWh = 0.0
+                var energySeconds = 0.0
+                resultList.zipWithNext().forEach { (before, after) ->
+                    val a = before.availablePower
+                    val b = after.availablePower
+                    val seconds = (after.timestampMillis - before.timestampMillis) / 1000.0
+                    if (before.wheelDataAvailable && after.wheelDataAvailable && a != null && b != null && seconds > 0 && seconds <= 5) {
+                        energyWh += (a + b) / 2 * seconds / 3600.0
+                        energySeconds += seconds
+                    }
+                }
+                val hasEnergy = if (first.legacyStatistics) resultList.any { it.availablePower != null } else energySeconds > 0
                 additionalJson = (runCatching { JSONObject(additionalJson ?: "{}") }.getOrDefault(JSONObject())).apply {
-                    put("tripStatsVersion", 3)
+                    put("tripStatsVersion", STATS_VERSION)
                     put("movingAverageSpeed", moving.movingAverage)
                     put("movingSeconds", moving.movingSeconds)
+                    put("hasWheelSpeed", wheelTicks.isNotEmpty())
+                    put("hasGpsSpeed", values.gpsMaximum != null)
+                    put("hasAverageSpeed", values.gpsMovingAverage != null || wheelTicks.isNotEmpty())
+                    put("hasPwm", values.maxPwm != null)
+                    put("hasEnergy", hasEnergy)
                     put("startedAt", first.timestampMillis)
                     put("endedAt", last.timestampMillis)
                 }.toString()
-                consumptionTotal = powers.average().toFloat() * logDuration / 60F
+                consumptionTotal = if (first.legacyStatistics) powers.average().toFloat() * logDuration / 60F else energyWh.toFloat()
                 consumptionByKm = if (distance > 0) {
                     consumptionTotal * 1000F / distance
                 } else {

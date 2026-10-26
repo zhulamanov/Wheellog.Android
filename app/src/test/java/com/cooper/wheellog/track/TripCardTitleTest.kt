@@ -73,7 +73,7 @@ class TripCardTitleTest {
 
     private fun bind(context: Context, file: String): Pair<String, TripModel> {
         val lookedUp = CountDownLatch(1)
-        val record = TripDataDbEntry(fileName = file, duration = 10, additionalJson = "{\"tripStatsVersion\":3}")
+        val record = TripDataDbEntry(fileName = file, duration = 10, additionalJson = "{\"tripStatsVersion\":4}")
         every { dao.getTripByFileName(file) } answers { lookedUp.countDown(); record }
         val binding = ListTripItemBinding.inflate(LayoutInflater.from(context))
         val holder = TripAdapter.ViewHolder(binding, Typeface.DEFAULT)
@@ -121,5 +121,23 @@ class TripCardTitleTest {
         val title = bind(context("en"), file(whenRecorded)).first
         assertTrue(title.contains(SimpleDateFormat("MMMM", Locale.ENGLISH).format(whenRecorded)))
         assertFalse(title.endsWith(".csv"))
+    }
+
+    @Test fun `tile shows dashes for unavailable wheel telemetry while preserving GPS readings and real zeros`() {
+        val binding = ListTripItemBinding.inflate(LayoutInflater.from(context("en")))
+        val holder = TripAdapter.ViewHolder(binding, Typeface.DEFAULT)
+        val record = TripDataDbEntry(fileName = "gps-only.csv", maxSpeed = 77f, maxSpeedGps = 72f,
+            maxPwm = 0f, distance = 1000, consumptionTotal = 0f, consumptionByKm = 0f,
+            additionalJson = "{\"hasWheelSpeed\":false,\"hasPwm\":false,\"hasEnergy\":false,\"hasGpsSpeed\":true}")
+        org.robolectric.util.ReflectionHelpers.callInstanceMethod<Unit>(holder, "setDescFromDb",
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(TripDataDbEntry::class.java, record))
+        for (metric in listOf(binding.metricWheelSpeed, binding.metricPwm, binding.metricEnergy, binding.metricConsumption))
+            assertTrue(metric.contentDescription.toString().endsWith(": —"))
+        assertTrue(binding.metricGpsSpeed.contentDescription.toString().contains("72"))
+        record.additionalJson = "{\"hasWheelSpeed\":true,\"hasPwm\":true,\"hasEnergy\":true}"
+        org.robolectric.util.ReflectionHelpers.callInstanceMethod<Unit>(holder, "setDescFromDb",
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(TripDataDbEntry::class.java, record))
+        assertFalse(binding.metricPwm.contentDescription.toString().contains("—"))
+        assertTrue(binding.metricPwm.contentDescription.toString().contains("0"))
     }
 }

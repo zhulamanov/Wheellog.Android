@@ -43,12 +43,17 @@ class LoggingService : Service(), LocationListener {
     private var wheel: NativeWheelSample? = null
     private var wheelAt = 0L
     private var connected = false
+    private var disconnectedAt = 0L
+    private var elapsedBase = 0L
+    private var elapsedSince: Long? = null
+    private var lastRowElapsed: Long? = null
+    private var csvColumns = NativeCsv.HEADER.split(',')
     private var subscribed = false
     private var locationEnabled = false
     private var segment = true
     private var csvTime = 0L
     private var lastChanged = 0L
-    private var destroying = false
+    @Volatile private var destroying = false
     private val binder = LocalBinder()
     private val settings by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private val changed = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -61,19 +66,25 @@ class LoggingService : Service(), LocationListener {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Constants.ACTION_BLUETOOTH_CONNECTION_STATE) {
                 val next = intent.getIntExtra(Constants.INTENT_EXTRA_CONNECTION_STATE, 0) == ConnectionState.CONNECTED.value
-                enqueue { connected = next; if (!next) { wheel = null; wheelAt = 0 } }
-            } else if (intent.action == Constants.ACTION_WHEEL_DATA_AVAILABLE) {
-                val data = WheelData.getInstance() ?: return
-                val next = data.bluetoothService?.connectionState?.let { it == ConnectionState.CONNECTED } ?: data.isConnected
-                val sample = NativeWheelSample.capture(data, data.distance, data.alert ?: "")
-                enqueue {
-                    connected = next
-                    if (!next || fileUtil == null) return@enqueue
-                    wheel = sample; wheelAt = SystemClock.elapsedRealtime()
-                    motion(sample.telemetry.speedKmh > .1)
-                    if (pauseState.pause == TrackPause.NONE) writeRow(if (sample.telemetry.speedKmh > .1) freshGps() else null, sample)
-                }
+                val receivedAt = System.currentTimeMillis()
+                enqueue { connected = next; if (!next) { wheel = null; wheelAt = 0; disconnectedAt = receivedAt } }
             }
+        }
+    }
+
+    private fun captureWheelData(data: WheelData) {
+        val packetAt = data.lastLifeData
+        val receivedAt = SystemClock.elapsedRealtime()
+        val sample = NativeWheelSample.capture(data, data.distance, data.alert ?: "")
+        enqueue {
+            if (fileUtil == null) return@enqueue
+            // Only the actual decoder invokes this path. Do not gate real packets on
+            // a cached BluetoothService state or delivery of an implicit UI broadcast.
+            if (packetAt > 0 && (packetAt <= disconnectedAt || System.currentTimeMillis() - packetAt !in -1_000..5_000)) return@enqueue
+            connected = true
+            wheel = sample; wheelAt = receivedAt
+            motion(sample.telemetry.speedKmh > .1)
+            if (pauseState.pause == TrackPause.NONE) writeRow(if (sample.telemetry.speedKmh > .1) freshGps() else null, sample)
         }
     }
 
@@ -81,11 +92,11 @@ class LoggingService : Service(), LocationListener {
     override fun onBind(intent: Intent): IBinder = binder
     override fun onCreate() {
         super.onCreate()
-        instance = this
         thread = HandlerThread("WheelLogCsv").apply { start() }
         worker = Handler(thread.looper)
+        instance = this
         ContextCompat.registerReceiver(this, receiver, IntentFilter().apply {
-            addAction(Constants.ACTION_WHEEL_DATA_AVAILABLE); addAction(Constants.ACTION_BLUETOOTH_CONNECTION_STATE)
+            addAction(Constants.ACTION_BLUETOOTH_CONNECTION_STATE)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
         settings.registerOnSharedPreferenceChangeListener(changed)
     }
@@ -138,6 +149,7 @@ class LoggingService : Service(), LocationListener {
             dayPreferences.getString("day", null) == today && dayPreferences.getString("mac", null) == mac
         val sourcePreferences = if (continuing) dayPreferences else preferences
         val recoveredName = sourcePreferences.getString("file", null)
+        val savedElapsed = sourcePreferences.getLong("elapsed", 0L)
         val recovered = recoveredName != null && sourcePreferences.getString("uri", null)?.let { source ->
             // Never recreate a deleted file while attempting to continue a day.
             val uri = android.net.Uri.parse(source)
@@ -161,7 +173,7 @@ class LoggingService : Service(), LocationListener {
         }
         check(preferences.edit().putString("file", file.fileName).putString("uri", file.contentUri.toString())
             .putString("path", file.absolutePath).putLong("start", started).putString("pause", pauseState.pause.name)
-            .putString("mac", mac).commit())
+            .putLong("elapsed", if (recovered) savedElapsed else 0L).putString("mac", mac).commit())
         fileUtil = file
         if (recovered) runCatching {
             org.koin.core.context.GlobalContext.get().getOrNull<com.cooper.wheellog.data.TripDao>()?.let { dao ->
@@ -169,14 +181,32 @@ class LoggingService : Service(), LocationListener {
             }
         }.onFailure { Timber.w(it, "Trip preview cache will be refreshed later") }
         val ticks = if (recovered) file.inputStream?.let(NativeCsv::read) ?: emptyList() else emptyList()
+        csvColumns = if (recovered) file.inputStream?.bufferedReader()?.use { it.readLine()?.trimStart('\uFEFF')?.split(',') }
+            ?: NativeCsv.HEADER.split(',') else NativeCsv.HEADER.split(',')
         val points = NativeCsv.points(ticks)
         csvTime = ticks.lastOrNull()?.timestampMillis ?: 0
+        elapsedBase = maxOf(if (recovered) savedElapsed else 0L, ticks.lastOrNull()?.recordingElapsedMillis
+            ?: ticks.takeIf { it.isNotEmpty() }?.let { (it.last().timestampMillis - it.first().timestampMillis).coerceAtLeast(0) } ?: 0L)
+        elapsedSince = null
+        updateRecordingClock()
+        lastRowElapsed = ticks.lastOrNull()?.recordingElapsedMillis ?: elapsedBase.takeIf { ticks.isNotEmpty() }
         mutableStatus.value = TrackStatus(recording = true, id = file.fileName, points = points.size, distance = summarizeTrack(points).distanceMeters,
             startedAt = started, paused = pauseState.pause != TrackPause.NONE, pauseReason = pauseState.pause)
         subscribe(); broadcast(logging = true)
     }
     private fun freshWheel(): NativeWheelSample? = wheel.takeIf { connected && SystemClock.elapsedRealtime() - wheelAt <= 5_000 }
     private fun freshGps(): TrackPoint? = gps?.takeIf { locationEnabled && System.currentTimeMillis() - it.time in -5_000..5_000 }
+    private fun recordingElapsed(now: Long = SystemClock.elapsedRealtime()): Long =
+        elapsedBase + (elapsedSince?.let { (now - it).coerceAtLeast(0) } ?: 0L)
+    private fun updateRecordingClock() {
+        val now = SystemClock.elapsedRealtime()
+        if (pauseState.pause == TrackPause.NONE) {
+            if (elapsedSince == null) elapsedSince = now
+        } else {
+            elapsedBase = recordingElapsed(now)
+            elapsedSince = null
+        }
+    }
     private fun motion(moving: Boolean, wheelEvidence: Boolean = true) {
         // After a long stop, carrying the phone on foot/in a car must not restart the wheel's route.
         if (pauseState.pause == TrackPause.AUTOMATIC && moving && !wheelEvidence) return
@@ -187,7 +217,8 @@ class LoggingService : Service(), LocationListener {
         }
     }
     private fun savePause() {
-        check(preferences.edit().putString("pause", pauseState.pause.name).commit())
+        updateRecordingClock()
+        check(preferences.edit().putString("pause", pauseState.pause.name).putLong("elapsed", recordingElapsed()).commit())
         mutableStatus.value = mutableStatus.value.copy(paused = pauseState.pause != TrackPause.NONE, pauseReason = pauseState.pause)
     }
     private fun setManualPause() { if (fileUtil != null) { pauseState.manualPause(); savePause(); unsubscribe(); gps = null; broadcast() } }
@@ -246,18 +277,28 @@ class LoggingService : Service(), LocationListener {
         val file = fileUtil ?: return
         if (pauseState.pause != TrackPause.NONE) return
         csvTime = maxOf(System.currentTimeMillis(), csvTime + 1)
-        file.appendLineChecked(NativeCsv.row(csvTime, point, sample, mutableStatus.value.distance, segment && point != null))
+        val elapsed = recordingElapsed()
+        file.appendLineChecked(NativeCsv.alignRow(NativeCsv.row(csvTime, point, sample, mutableStatus.value.distance,
+            segment && point != null, elapsed), csvColumns))
+        lastRowElapsed = elapsed
         if (point != null) segment = false
         if (SystemClock.elapsedRealtime() - lastChanged > 15_000) broadcast()
     }
     private fun finishRecording(continueDay: Boolean = false) {
         unsubscribe()
         val file = fileUtil
+        // Timing only: no invented coordinates, speed or wheel readings. This retains
+        // short final stops, while manual/automatic pauses remain excluded by the clock.
+        val elapsed = recordingElapsed()
+        if (file != null && lastRowElapsed?.let { elapsed - it >= 1_000 } == true)
+            file.appendLineChecked(NativeCsv.alignRow(NativeCsv.row(maxOf(System.currentTimeMillis(), csvTime + 1),
+                null, null, mutableStatus.value.distance, false, elapsed), csvColumns))
         fileUtil = null
         file?.close()
         if (continueDay && file != null) {
             check(dayPreferences.edit().clear().putString("file", file.fileName).putString("uri", file.contentUri.toString())
                 .putString("path", file.absolutePath).putLong("start", mutableStatus.value.startedAt)
+                .putLong("elapsed", elapsed)
                 .putString("mac", preferences.getString("mac", "GPS"))
                 .putString("day", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())).commit())
         } else if (!continueDay) check(dayPreferences.edit().clear().commit())
@@ -308,6 +349,7 @@ class LoggingService : Service(), LocationListener {
         val isAlive get() = instance != null
         val currentLogFileName get() = status.value.id
         fun isInstanceCreated() = status.value.recording
+        @JvmStatic fun onWheelDataDecoded(data: WheelData) { instance?.captureWheelData(data) }
         fun hasPermission(context: Context) = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         fun disableLocation() { instance?.let { if (it.locationEnabled) command(it, EXIT) } }
         fun maybeAutoStart(context: Context, config: AppConfig) {

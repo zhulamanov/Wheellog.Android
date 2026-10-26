@@ -193,6 +193,8 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
         }
 
         private fun setDescFromDb(trip: TripDataDbEntry?) {
+            val available = runCatching { JSONObject(trip?.additionalJson ?: "{}") }.getOrDefault(JSONObject())
+            fun metric(value: Float?, name: String) = value?.takeIf { available.optBoolean(name, true) }
             val color = context.tripTextColor()
             val muted = context.tripMutedColor()
             val locale = com.cooper.wheellog.LocaleManager.getLocale(context.resources)
@@ -201,15 +203,15 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
             val speedUnit = context.getString(if (appConfig.useMph) R.string.mph else R.string.kmh)
             val distanceUnit = context.getString(if (appConfig.useMph) R.string.miles else R.string.km)
             fun bind(view: TripMetricView, icon: String, value: String, label: String) = view.bind(icon, value, label, color, muted, font)
-            bind(itemBinding.metricWheelSpeed, "🚀", speed(trip?.maxSpeed), "$speedUnit · " + context.getString(R.string.trip_metric_wheel))
-            bind(itemBinding.metricGpsSpeed, "📡", speed(trip?.maxSpeedGps), "$speedUnit · GPS")
-            bind(itemBinding.metricAverage, "♿", speed(trip?.avgSpeed), "$speedUnit · " + context.getString(R.string.trip_metric_average))
-            bind(itemBinding.metricPwm, "😱", number(trip?.maxPwm), "% · PWM")
+            bind(itemBinding.metricWheelSpeed, "🚀", speed(metric(trip?.maxSpeed, "hasWheelSpeed")), "$speedUnit · " + context.getString(R.string.trip_metric_wheel))
+            bind(itemBinding.metricGpsSpeed, "📡", speed(metric(trip?.maxSpeedGps, "hasGpsSpeed")), "$speedUnit · GPS")
+            bind(itemBinding.metricAverage, "♿", speed(metric(trip?.avgSpeed, "hasAverageSpeed")), "$speedUnit · " + context.getString(R.string.trip_metric_average))
+            bind(itemBinding.metricPwm, "😱", number(metric(trip?.maxPwm, "hasPwm")), "% · PWM")
             bind(itemBinding.metricDuration, "⌚", trip?.duration?.toString() ?: "—", context.getString(R.string.min))
             bind(itemBinding.metricDistance, "📏", speed(trip?.distance?.div(1000f)), distanceUnit)
-            bind(itemBinding.metricEnergy, "⚡", number(trip?.consumptionTotal), context.getString(R.string.wh))
+            bind(itemBinding.metricEnergy, "⚡", number(metric(trip?.consumptionTotal, "hasEnergy")), context.getString(R.string.wh))
             val consumption = trip?.consumptionByKm?.let { if (appConfig.useMph) it / kmToMilesMultiplier.toFloat() else it }
-            bind(itemBinding.metricConsumption, "🔋", number(consumption), context.getString(if (appConfig.useMph) R.string.whmi else R.string.whkm))
+            bind(itemBinding.metricConsumption, "🔋", number(metric(consumption?.takeIf { (trip?.distance ?: 0) > 0 }, "hasEnergy")), context.getString(if (appConfig.useMph) R.string.whmi else R.string.whkm))
         }
 
         private fun setFriendlyName() {
@@ -264,7 +266,7 @@ class TripAdapter(var context: Context, private var tripModels: ArrayList<TripMo
                         -1
                     }
                 if (trip == null || LoggingService.currentLogFileName == tripModel.fileName || trip?.duration == 0 || runCatching {
-                        JSONObject(trip?.additionalJson ?: "{}").optInt("tripStatsVersion") != 3
+                        JSONObject(trip?.additionalJson ?: "{}").optInt("tripStatsVersion") != TripParser.STATS_VERSION
                     }.getOrDefault(true)) {
                     trip = TripParser.parseFile(context, tripModel.fileName, tripModel.pathLegacyAndroid ?: "", tripModel.uri).second
                 }

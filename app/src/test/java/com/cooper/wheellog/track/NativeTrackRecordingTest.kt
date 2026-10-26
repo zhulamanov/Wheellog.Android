@@ -104,7 +104,7 @@ class NativeTrackRecordingTest {
         every { wheel.speedDouble } returns 42.0
         every { wheel.calculatedPwm } returns 73.5
         every { wheel.batteryLevel } returns 82
-        context.sendBroadcast(Intent(Constants.ACTION_WHEEL_DATA_AVAILABLE).setPackage(context.packageName)); drain(service)
+        LoggingService.onWheelDataDecoded(wheel); drain(service)
         fix(service)
         assertEquals(73.5, NativeCsv.points(ticks()).last().telemetry!!.pwm, .001)
         context.sendBroadcast(Intent(Constants.ACTION_BLUETOOTH_CONNECTION_STATE).setPackage(context.packageName)
@@ -119,6 +119,83 @@ class NativeTrackRecordingTest {
         assertFalse("state=${LoggingService.status.value}; now=${System.currentTimeMillis()}; csv=${provider.files.values.single().first.readText()}", last.wheelDataAvailable)
         assertNull(NativeCsv.points(ticks()).last().telemetry)
         assertTrue(LoggingService.status.value.recording)
+    }
+
+    @Test fun `decoded packets are recorded even when a cached Bluetooth service reports disconnected`() {
+        val service = start()
+        val bluetooth = mockk<BluetoothService>(relaxed = true)
+        every { bluetooth.connectionState } returns ConnectionState.DISCONNECTED
+        every { wheel.bluetoothService } returns bluetooth
+        every { wheel.isConnected } returns true
+        every { wheel.lastLifeData } answers { System.currentTimeMillis() }
+        every { wheel.speedDouble } returns 94.0
+        every { wheel.rawSpeedDouble } returns 100.0
+        every { wheel.appliedSpeedCorrectionPercent } returns -6
+        every { wheel.calculatedPwm } returns 73.5
+        every { wheel.voltageDouble } returns 140.6
+        every { wheel.powerDouble } returns 2000.0
+        // Invoke the same decoder callback as WheelData.decodeResponse.
+        LoggingService.onWheelDataDecoded(wheel); drain(service)
+        assertTrue(ticks().single().wheelDataAvailable)
+        assertEquals(94.0, ticks().single().speed, .001)
+        assertEquals(73.5, ticks().single().pwm, .001)
+        fix(service)
+        assertEquals(140.6, NativeCsv.points(ticks()).last().telemetry!!.voltage, .001)
+        val oldPacket = System.currentTimeMillis() - 100
+        context.sendBroadcast(Intent(Constants.ACTION_BLUETOOTH_CONNECTION_STATE).setPackage(context.packageName)
+            .putExtra(Constants.INTENT_EXTRA_CONNECTION_STATE, ConnectionState.DISCONNECTED.value)); drain(service)
+        val count = ticks().size
+        every { wheel.lastLifeData } returns oldPacket
+        LoggingService.onWheelDataDecoded(wheel); drain(service)
+        assertEquals(count, ticks().size)
+    }
+
+    @Test fun `real WheelData decode path writes telemetry with minus six percent correction without UI receivers`() {
+        config.lastMac = "AA:BB:CC:DD:EE:FF"
+        config.useSpeedCorrection = true
+        config.speedCorrectionPercent = -6
+        val service = start()
+        val live = spyk(WheelData())
+        val adapter = mockk<com.cooper.wheellog.utils.BaseAdapter>(relaxed = true)
+        every { adapter.decode(any()) } returns true
+        every { live.adapter } returns adapter
+        every { WheelData.getInstance() } returns live
+        live.speed = 10_000
+        live.voltage = 14_060
+        live.current = 1_500
+        live.setPower(200_000)
+        live.temperature = 3_700
+        live.output = 6_800
+        live.updatePwm()
+        ReflectionHelpers.callInstanceMethod<Unit>(live, "decodeResponse",
+            ReflectionHelpers.ClassParameter.from(ByteArray::class.java, byteArrayOf(1)),
+            ReflectionHelpers.ClassParameter.from(Context::class.java, context))
+        drain(service)
+        val sample = ticks().single()
+        assertTrue(sample.wheelDataAvailable)
+        assertEquals(94.0, sample.speed, .001)
+        assertEquals(140.6, sample.voltage, .001)
+        assertEquals(2000.0, sample.power, .001)
+        assertEquals(68.0, sample.pwm, .001)
+        assertEquals(37, sample.temperature)
+        fix(service)
+        assertEquals(36.0, ticks().last().speedGps, .001)
+        assertEquals(68.0, NativeCsv.points(ticks()).last().telemetry!!.pwm, .001)
+    }
+
+    @Test fun `recording clock retains a short stop but excludes a manual pause`() {
+        val service = start()
+        val time = System.currentTimeMillis()
+        fix(service, timestamp = time)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); fix(service, .0001, timestamp = time + 1_000)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(10)); command(service, LoggingService.PAUSE)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(60)); command(service, LoggingService.RESUME)
+        fix(service, .0002, timestamp = time + 2_000)
+        assertEquals(11_000L, ticks().last().recordingElapsedMillis)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); fix(service, .0003, timestamp = time + 3_000)
+        command(service, LoggingService.EXIT)
+        assertEquals(12_000L, ticks().last().recordingElapsedMillis)
+        assertFalse(ticks().last().hasLocation)
     }
     @Test fun `manual pause blocks rows and explicit resume appends to the same CSV with a segment boundary`() {
         val service = start(); fix(service)
@@ -147,7 +224,7 @@ class NativeTrackRecordingTest {
         assertEquals(0, ticks().size)
         every { wheel.isConnected } returns true
         every { wheel.speedDouble } returns 12.0
-        context.sendBroadcast(Intent(Constants.ACTION_WHEEL_DATA_AVAILABLE).setPackage(context.packageName)); drain(service)
+        LoggingService.onWheelDataDecoded(wheel); drain(service)
         ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); fix(service, .0012)
         assertEquals(TrackPause.NONE, LoggingService.status.value.pauseReason)
         assertEquals(id, LoggingService.currentLogFileName)

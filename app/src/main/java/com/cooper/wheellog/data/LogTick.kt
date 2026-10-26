@@ -67,4 +67,6 @@ data class LogTick(
     val availableVoltage: Double? = voltage.takeIf { wheelDataAvailable },
     val availableTemperature: Double? = temperature.toDouble().takeIf { wheelDataAvailable },
     val gpsSpeedAvailable: Boolean = hasLocation,
+    /** Active recording time excludes explicit/automatic pauses; never a sensor reading. */
+    val recordingElapsedMillis: Long? = null,
 )
