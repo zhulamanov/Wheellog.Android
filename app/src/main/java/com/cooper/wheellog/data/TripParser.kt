@@ -20,7 +20,7 @@ import java.util.Locale
 import org.json.JSONObject
 
 object TripParser: KoinComponent {
-    const val STATS_VERSION = 5
+    const val STATS_VERSION = 6
     private val dao: TripDao by inject()
     private val errors = ThreadLocal<String?>()
     private var lastErrorValue: String?
@@ -107,7 +107,13 @@ object TripParser: KoinComponent {
                     if (it.pwmAvailable) maxPwm = maxPwm.coerceAtLeast(it.pwm.toFloat())
                 }
 
-                val maxTotalDistance = resultList.subList(0.coerceAtLeast(resultList.size - 10), resultList.size).maxOf { it.totalDistance }
+                val maxTotalDistance = if (first.legacyStatistics) {
+                    resultList.subList(0.coerceAtLeast(resultList.size - 10), resultList.size).maxOf { it.totalDistance }
+                } else {
+                    // GPS-only/timing-only rows have no wheel odometer. Keep the last
+                    // actual reading even when more than ten such rows end the file.
+                    resultList.lastOrNull { it.wheelDataAvailable && it.totalDistance > 0 }?.totalDistance ?: 0
+                }
                 val logDuration = if (first.legacyStatistics) (last.time - first.time - timeToExclude) / 600
                 else resultList.zipWithNext().sumOf { (before, after) ->
                     ((after.timestampMillis - before.timestampMillis) / 1000.0).takeIf { it > 0 && it <= 10 } ?: 0.0

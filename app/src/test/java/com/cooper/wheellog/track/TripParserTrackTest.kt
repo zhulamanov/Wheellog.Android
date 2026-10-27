@@ -20,6 +20,34 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [29])
 class TripParserTrackTest {
+    @Test fun `last wheel odometer survives long GPS only and timing only file endings`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dao = mockk<TripDao>(relaxed = true)
+        every { dao.getTripByFileName(any()) } returns null
+        startKoin { modules(module { single { dao } }) }
+        try {
+            val time = 1_700_000_000_000L
+            fun sample(total: Int) = com.cooper.wheellog.data.NativeWheelSample(
+                listOf("20", "140", "0", "1", "140", "0", "50", "80", "0", "$total", "30", "30", "0", "0", "", ""),
+                TrackTelemetry(20.0, 80, 140.0, 30, 50.0))
+            fun point(offset: Int) = TrackPoint(time + offset * 1_000, 50.0 + offset.coerceAtMost(1) * .001,
+                10.0, null, 5f, 0f)
+            for (gpsTail in listOf(false, true)) {
+                val rows = listOf(
+                    com.cooper.wheellog.data.NativeCsv.row(time, point(0), sample(10_000), 0.0, true),
+                    com.cooper.wheellog.data.NativeCsv.row(time + 1_000, point(1), sample(20_000), 100.0, false)
+                ) + (2..22).map { offset ->
+                    com.cooper.wheellog.data.NativeCsv.row(time + offset * 1_000, point(offset).takeIf { gpsTail }, null, 100.0, false)
+                }
+                val csv = com.cooper.wheellog.data.NativeCsv.HEADER + "\n" + rows.joinToString("\n")
+                val parsed = TripParser.parseFile(context, "tail-$gpsTail.csv", csv.byteInputStream())
+                assertEquals("", TripParser.lastError)
+                assertEquals(10_000, parsed.second!!.distance)
+                assertTrue(parsed.first.takeLast(10).none { it.wheelDataAvailable })
+            }
+        } finally { stopKoin() }
+    }
+
     @Test fun `GPS only CSV never labels GPS maximum as wheel speed or missing energy as measured zero`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dao = mockk<TripDao>(relaxed = true)

@@ -63,8 +63,12 @@ Fresh decoded wheel packets feed the CSV writer directly, independently of UI br
 and cached BluetoothService state. Disconnects invalidate the cached sample; old decoded
 timestamps are rejected. GPS-only files cannot supply wheel maxima, PWM or consumption:
 cards display a dash rather than labeling GPS speed as wheel speed or substituting zero.
-CSV summaries use availability metadata and are refreshed from version5 caches.
+CSV summaries use availability metadata and are refreshed from version6 caches.
 Extended-file energy integrates available power over valid short intervals only.
+Extended-file distance retains the last available wheel odometer even when the
+file ends with many GPS-only or timing-only rows. The upstream summary behavior
+for historical CSV files is unchanged. Dashboard session distance and the wheel's
+own trip counter are independent of a same-day CSV file's combined distance.
 
 All recorded parts of a daily file contribute to their own GPS and wheel maxima;
 missing wheel telemetry is never replaced by a GPS maximum. Graphs separate line
