@@ -8,8 +8,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.cooper.wheellog.R
 import com.cooper.wheellog.databinding.ChartFragmentBinding
-import com.cooper.wheellog.utils.SomeUtil.getColorEx
 import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.Legend
+import com.github.mikephil.charting.components.LegendEntry
+import com.github.mikephil.charting.components.YAxis
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
@@ -66,20 +68,7 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
 
     private fun tripDataReceived(chart: LineChart, stats: List<LineDataSet>) {
         chart.apply {
-            if (stats.none { it.entryCount > 0 }) { clear(); return }
-            data = LineData().apply {
-                stats.filter { it.entryCount > 0 }.forEach {
-                    addDataSet(it)
-                }
-            }
-            legend.setCustom(stats.distinctBy { it.label }.map { series ->
-                com.github.mikephil.charting.components.LegendEntry().apply {
-                    label = series.label
-                    formColor = series.color
-                    form = com.github.mikephil.charting.components.Legend.LegendForm.SQUARE
-                }
-            })
-            axisRight.isEnabled = stats.any { it.axisDependency == com.github.mikephil.charting.components.YAxis.AxisDependency.RIGHT }
+            if (!bindStatsChartData(chart, stats)) return
             marker = ChartMarkerView(requireContext(), chart.xAxis.valueFormatter, stats).apply { chartView = chart }
             invalidate()
         }
@@ -100,6 +89,25 @@ class StatsFragment: Fragment(), OnChartValueSelectedListener {
     }
 }
 
+/** Set the final legend before setData synchronously measures it and reserves chart offsets. */
+internal fun bindStatsChartData(chart: LineChart, stats: List<LineDataSet>): Boolean {
+    val visibleSeries = stats.filter { it.entryCount > 0 }
+    if (visibleSeries.isEmpty()) {
+        chart.clear()
+        return false
+    }
+    chart.legend.setCustom(visibleSeries.distinctBy { it.label }.map { series ->
+        LegendEntry().apply {
+            label = series.label
+            formColor = series.color
+            form = Legend.LegendForm.SQUARE
+        }
+    })
+    chart.axisRight.isEnabled = visibleSeries.any { it.axisDependency == YAxis.AxisDependency.RIGHT }
+    chart.data = LineData().apply { visibleSeries.forEach { addDataSet(it) } }
+    return true
+}
+
 /** Shared with the chart appearance checks so they inspect the actual label configuration. */
 internal fun styleStatsChart(chart: LineChart, timeFormatter: ValueFormatter) {
     chart.apply {
@@ -110,6 +118,8 @@ internal fun styleStatsChart(chart: LineChart, timeFormatter: ValueFormatter) {
         legend.textColor = context.statsTextColor()
         legend.textSize = 13f
         legend.isWordWrapEnabled = true
+        legend.xEntrySpace = 10f
+        legend.yEntrySpace = 4f
         setNoDataText(context.getString(R.string.no_chart_data))
         setNoDataTextColor(context.statsTextColor())
         getPaint(com.github.mikephil.charting.charts.Chart.PAINT_INFO).textSize =
