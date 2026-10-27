@@ -68,6 +68,27 @@ class WheelDataTest: KoinTest {
         assertThat(data.remainingDistance).isEqualTo(188)
     }
 
+    @Test fun `recorded distance origin is independent of session averages and speed correction`() {
+        data.totalDistance = 100_000
+        data.totalDistance = 105_000
+        WheelData::class.java.getDeclaredField("mRidingTime").apply { isAccessible = true }.setInt(data, 600)
+        WheelData::class.java.getDeclaredField("mRideTime").apply { isAccessible = true }.setInt(data, 900)
+        data.setRecordingDistanceStart(90_000L)
+        assertThat(data.distanceDouble).isEqualTo(15.0)
+        assertThat(data.distance).isEqualTo(15_000)
+        assertThat(data.getDistanceAtOdometer(104_000)).isEqualTo(14_000)
+        assertThat(data.averageRidingSpeedDouble).isEqualTo(30.0)
+        every { appConfig.appliedSpeedCorrectionPercent } returns -6
+        assertThat(data.distanceDouble).isEqualTo(15.0)
+        assertThat(data.averageRidingSpeedDouble).isWithin(.001).of(28.2)
+        data.setRecordingDistanceStart(null)
+        assertThat(data.distanceDouble).isEqualTo(0.0)
+        data.totalDistance = 106_000
+        assertThat(data.distanceDouble).isEqualTo(1.0)
+        data.reset()
+        assertThat(data.distanceDouble).isEqualTo(0.0)
+    }
+
     @Test
     fun `Battery per km | 50 to 0`() {
         // Arrange.

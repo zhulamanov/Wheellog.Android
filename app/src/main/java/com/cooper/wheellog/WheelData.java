@@ -25,6 +25,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import timber.log.Timber;
 
@@ -98,6 +99,10 @@ public class WheelData {
     private WHEEL_TYPE mWheelType = WHEEL_TYPE.Unknown;
     private long rideStartTime;
     private long mStartTotalDistance;
+    // A continued CSV can start before this live dashboard session. Keep its
+    // distance origin separate from the counters used for session averages.
+    // null: no recording origin; -1: waiting for the first live wheel odometer.
+    private final AtomicReference<Long> mRecordingStartTotalDistance = new AtomicReference<>();
 
     private double mCalculatedPwm = 0.0;
     private double mMaxPwm = 0.0;
@@ -894,7 +899,7 @@ public class WheelData {
     }
 
     int getDistance() {
-        return (int) (mTotalDistance - mStartTotalDistance);
+        return (int) getRecordedDistanceMeters();
     }
 
     long getWheelDistance() {
@@ -956,7 +961,30 @@ public class WheelData {
     }
 
     public double getDistanceDouble() {
-        return (mTotalDistance - mStartTotalDistance) / 1000.0;
+        return getRecordedDistanceMeters() / 1000.0;
+    }
+
+    /** Restore distance only, without replaying archived live sensor readings. */
+    public void setRecordingDistanceStart(Long startTotalDistance) {
+        mRecordingStartTotalDistance.set(startTotalDistance != null && startTotalDistance >= 0
+                ? startTotalDistance : -1L);
+    }
+
+    private long getRecordedDistanceMeters() {
+        return getDistanceAtOdometer(mTotalDistance);
+    }
+
+    public long getDistanceAtOdometer(long odometer) {
+        if (odometer <= 0) return 0;
+        Long start = mRecordingStartTotalDistance.get();
+        if (start != null && start < 0) {
+            // A GPS-only start has no odometer yet. The first live wheel packet
+            // establishes the origin, rather than displaying the lifetime total.
+            mRecordingStartTotalDistance.compareAndSet(start, odometer);
+            start = mRecordingStartTotalDistance.get();
+        }
+        long origin = start == null ? mStartTotalDistance : start < 0 ? odometer : start;
+        return Math.max(0, odometer - origin);
     }
 
     public double getTotalDistanceDouble() {
@@ -1255,6 +1283,7 @@ public class WheelData {
         mBtName = "";
         rideStartTime = 0;
         mStartTotalDistance = 0;
+        mRecordingStartTotalDistance.set(null);
         protoVer = "";
         mWheelAlarm = false;
         mWheelIsReady = false;

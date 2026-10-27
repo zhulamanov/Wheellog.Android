@@ -67,8 +67,15 @@ CSV summaries use availability metadata and are refreshed from version6 caches.
 Extended-file energy integrates available power over valid short intervals only.
 Extended-file distance retains the last available wheel odometer even when the
 file ends with many GPS-only or timing-only rows. The upstream summary behavior
-for historical CSV files is unchanged. Dashboard session distance and the wheel's
-own trip counter are independent of a same-day CSV file's combined distance.
+for historical CSV files is unchanged.
+The dashboard Distance block restores the continued CSV's starting wheel odometer
+after a restart, so it includes earlier rides in that file. The origin is saved for
+new recordings; older files fall back to their first available wheel odometer.
+Explicit Stop followed by Start creates a new distance origin. With no wheel
+odometer yet, GPS-only history cannot invent one: the first live reading establishes
+it. This file-distance origin is separate from live session timing/average-speed
+counters and does not replay archived voltage, current or other live sensors.
+Speed correction does not alter this distance or the lifetime wheel odometer.
 
 All recorded parts of a daily file contribute to their own GPS and wheel maxima;
 missing wheel telemetry is never replaced by a GPS maximum. Graphs separate line

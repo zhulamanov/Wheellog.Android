@@ -84,6 +84,17 @@ class NativeTrackRecordingTest {
         }); drain(service)
     }
     private fun ticks() = NativeCsv.read(provider.files.values.single().first.inputStream())
+    private fun realWheel(mac: String = "AA:BB:CC:DD:EE:FF"): WheelData = spyk(WheelData()).also { live ->
+        wheel = live
+        every { live.mac } returns mac
+        every { live.bluetoothService } returns null
+        every { WheelData.getInstance() } returns live
+    }
+    private fun wheelPacket(service: LoggingService, odometer: Long) {
+        wheel.totalDistance = odometer
+        LoggingService.onWheelDataDecoded(wheel)
+        drain(service)
+    }
     @After fun cleanup() {
         controller?.let { command(it.get(), LoggingService.EXIT); it.destroy() }
         controller = null; unmockkAll(); stopKoin()
@@ -283,6 +294,121 @@ class NativeTrackRecordingTest {
         assertTrue(points.last().segmentStart)
         assertEquals(0.0, summarizeTrack(points).distanceMeters, .001)
         assertTrue(provider.files.values.single().first.readBytes().take(original.size).toByteArray().contentEquals(original))
+    }
+
+    @Test fun `dashboard distance restores the continued day after a fresh wheel data instance`() {
+        config.continueThisDayLog = true
+        config.lastMac = "AA:BB:CC:DD:EE:FF"
+        val firstWheel = realWheel().apply {
+            totalDistance = 10_000
+            voltage = 14_000
+            current = 1_000
+            setPower(140_000)
+        }
+        val morning = start()
+        wheelPacket(morning, 10_000)
+        wheelPacket(morning, 15_000)
+        assertEquals(5.0, firstWheel.distanceDouble, .001)
+        val id = LoggingService.currentLogFileName
+        command(morning, LoggingService.EXIT)
+        val prefix = provider.files.values.single().first.readBytes()
+        controller!!.destroy(); controller = null
+        context.getSharedPreferences("native_logging_day", Context.MODE_PRIVATE).edit().remove("distance_start").commit()
+        val fresh = realWheel("default") // BLE may not yet be bound after restarting the app.
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(60))
+        val lunch = start()
+        assertEquals(id, LoggingService.currentLogFileName)
+        assertEquals(0.0, fresh.distanceDouble, .001)
+        assertEquals(0.0, fresh.voltageDouble, .001)
+        assertEquals(0.0, fresh.currentDouble, .001)
+        wheelPacket(lunch, 15_000)
+        wheelPacket(lunch, 18_000)
+        assertEquals(8.0, fresh.distanceDouble, .001)
+        assertEquals(8_000, ticks().last().distance)
+        assertEquals(3_000.0, fresh.distanceFromStart, .001) // session-average numerator stays in its own time window
+        assertTrue(provider.files.values.single().first.readBytes().take(prefix.size).toByteArray().contentEquals(prefix))
+    }
+
+    @Test fun `explicit Stop starts a new distance origin and later Exit continues that new origin`() {
+        config.continueThisDayLog = true
+        realWheel().totalDistance = 10_000
+        val service = start()
+        wheelPacket(service, 10_000); wheelPacket(service, 15_000)
+        command(service, LoggingService.STOP)
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1)); command(service, LoggingService.START)
+        assertEquals(0.0, wheel.distanceDouble, .001)
+        wheelPacket(service, 17_000)
+        assertEquals(2.0, wheel.distanceDouble, .001)
+        val lunch = LoggingService.currentLogFileName
+        command(service, LoggingService.EXIT)
+        controller!!.destroy(); controller = null
+        realWheel()
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(60))
+        val evening = start()
+        assertEquals(lunch, LoggingService.currentLogFileName)
+        wheelPacket(evening, 18_000)
+        assertEquals(3.0, wheel.distanceDouble, .001) // saved origin precedes this file's first recorded sample
+        assertEquals(2, provider.files.size)
+    }
+
+    @Test fun `unfinished recording restores dashboard distance even when same day continuation is off`() {
+        realWheel().totalDistance = 20_000
+        val first = start()
+        wheelPacket(first, 20_000); wheelPacket(first, 24_000)
+        val id = LoggingService.currentLogFileName
+        controller!!.destroy(); controller = null // process death, not Exit or Stop
+        realWheel()
+        val restored = start("csv.restore")
+        assertEquals(id, LoggingService.currentLogFileName)
+        wheelPacket(restored, 26_000)
+        assertEquals(6.0, wheel.distanceDouble, .001)
+        assertEquals(6_000, ticks().last().distance)
+    }
+
+    @Test fun `starting a fresh log without day continuation preserves distance since app session start`() {
+        realWheel().apply { totalDistance = 10_000; totalDistance = 15_000 }
+        assertEquals(5.0, wheel.distanceDouble, .001)
+        val service = start()
+        assertEquals(5.0, wheel.distanceDouble, .001)
+        wheelPacket(service, 16_000)
+        assertEquals(6.0, wheel.distanceDouble, .001)
+        assertEquals(6_000, ticks().last().distance)
+    }
+
+    @Test fun `GPS only history waits for a real wheel odometer without using lifetime distance`() {
+        config.continueThisDayLog = true
+        realWheel()
+        val first = start(); fix(first)
+        command(first, LoggingService.EXIT)
+        controller!!.destroy(); controller = null
+        realWheel()
+        val continued = start()
+        wheelPacket(continued, 100_000)
+        assertEquals(0.0, wheel.distanceDouble, .001)
+        wheelPacket(continued, 101_000)
+        assertEquals(1.0, wheel.distanceDouble, .001)
+        assertTrue(ticks().first().hasLocation)
+    }
+
+    @Test fun `another wheel or yesterday starts a fresh dashboard distance origin`() {
+        config.continueThisDayLog = true
+        realWheel().totalDistance = 10_000
+        val first = start(); wheelPacket(first, 10_000); wheelPacket(first, 15_000)
+        command(first, LoggingService.EXIT)
+        controller!!.destroy(); controller = null
+        realWheel("11:22:33:44:55:66").totalDistance = 200_000
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+        val second = start(); wheelPacket(second, 200_000); wheelPacket(second, 201_000)
+        assertEquals(1.0, wheel.distanceDouble, .001)
+        assertEquals(2, provider.files.size)
+        command(second, LoggingService.EXIT)
+        controller!!.destroy(); controller = null
+        context.getSharedPreferences("native_logging_day", Context.MODE_PRIVATE).edit().putString("day", "2000-01-01").commit()
+        realWheel("11:22:33:44:55:66").totalDistance = 201_000
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+        val nextDay = start(); wheelPacket(nextDay, 201_000); wheelPacket(nextDay, 202_000)
+        assertEquals(1.0, wheel.distanceDouble, .001)
+        assertEquals(3, provider.files.size)
     }
 
     @Test fun `morning Stop creates a lunch trip and evening continues lunch until the next Stop`() {

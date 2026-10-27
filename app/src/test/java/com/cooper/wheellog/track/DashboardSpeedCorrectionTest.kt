@@ -30,7 +30,7 @@ class DashboardSpeedCorrectionTest {
         val config = AppConfig(base)
         config.lastMac = "AA:BB:CC:DD:EE:FF"
         config.useMph = false
-        config.viewBlockIds = listOf("speed", "top_speed", "average_riding_speed", "average_speed")
+        config.viewBlockIds = listOf("speed", "top_speed", "average_riding_speed", "average_speed", "distance")
         startKoin { modules(module { single { config } }) }
         val previousTheme = ThemeManager.theme
         ThemeManager.theme = R.style.InfernoTheme
@@ -77,6 +77,13 @@ class DashboardSpeedCorrectionTest {
             config.useSpeedCorrection = false
             assertTrue(tile("top_speed").startsWith("76.3 "))
             assertTrue(tile("average_riding_speed").startsWith("30.0 "))
+            wheel.setRecordingDistanceStart(95_000L)
+            adapter.updateScreen(false)
+            assertTrue(tile("distance").startsWith("10.00 "))
+            config.speedCorrectionPercent = -6
+            config.useSpeedCorrection = true
+            assertTrue(tile("distance").startsWith("10.00 "))
+            assertTrue(tile("average_riding_speed").startsWith("28.2 "))
         } finally {
             if (adapter != null && recycler != null) adapter.onDetachedFromRecyclerView(recycler)
             ThemeManager.theme = previousTheme

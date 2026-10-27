@@ -81,10 +81,17 @@ class LoggingService : Service(), LocationListener {
             // Only the actual decoder invokes this path. Do not gate real packets on
             // a cached BluetoothService state or delivery of an implicit UI broadcast.
             if (packetAt > 0 && (packetAt <= disconnectedAt || System.currentTimeMillis() - packetAt !in -1_000..5_000)) return@enqueue
+            val odometer = sample.columns[9].toLongOrNull()
+            val loggedSample = if (odometer == null) sample else sample.copy(columns = sample.columns.toMutableList().apply {
+                this[8] = data.getDistanceAtOdometer(odometer).toString()
+            })
+            if (odometer != null && odometer > 0 && preferences.getLong("distance_start", -1) < 0) {
+                check(preferences.edit().putLong("distance_start", odometer - data.getDistanceAtOdometer(odometer)).commit())
+            }
             connected = true
-            wheel = sample; wheelAt = receivedAt
-            motion(sample.telemetry.speedKmh > .1)
-            if (pauseState.pause == TrackPause.NONE) writeRow(if (sample.telemetry.speedKmh > .1) freshGps() else null, sample)
+            wheel = loggedSample; wheelAt = receivedAt
+            motion(loggedSample.telemetry.speedKmh > .1)
+            if (pauseState.pause == TrackPause.NONE) writeRow(if (loggedSample.telemetry.speedKmh > .1) freshGps() else null, loggedSample)
         }
     }
 
@@ -143,11 +150,16 @@ class LoggingService : Service(), LocationListener {
         if (fileUtil != null) return
         val file = FileUtil(this)
         val pendingName = preferences.getString("file", null)
-        val mac = WheelData.getInstance()?.mac?.takeIf { it.isNotBlank() } ?: "GPS"
+        val forceNewDistance = preferences.getBoolean("new_distance", false)
+        val data = WheelData.getInstance()
+        fun knownMac(value: String?) = value?.takeIf { it.isNotBlank() && it != "default" && it != "GPS" }
+        val mac = knownMac(data?.mac) ?: knownMac(config.lastMac) ?: "GPS"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val continuing = pendingName == null && config.continueThisDayLog &&
             dayPreferences.getString("day", null) == today && dayPreferences.getString("mac", null) == mac
         val sourcePreferences = if (continuing) dayPreferences else preferences
+        val recordedMac = sourcePreferences.getString("mac", null)
+        val savedDistanceStart = sourcePreferences.getLong("distance_start", -1).takeIf { it >= 0 }
         val recoveredName = sourcePreferences.getString("file", null)
         val savedElapsed = sourcePreferences.getLong("elapsed", 0L)
         val recovered = recoveredName != null && sourcePreferences.getString("uri", null)?.let { source ->
@@ -171,7 +183,7 @@ class LoggingService : Service(), LocationListener {
             file.appendLineChecked(NativeCsv.HEADER)
             pauseState = TrackPauseState()
         }
-        check(preferences.edit().putString("file", file.fileName).putString("uri", file.contentUri.toString())
+        check(preferences.edit().remove("new_distance").putString("file", file.fileName).putString("uri", file.contentUri.toString())
             .putString("path", file.absolutePath).putLong("start", started).putString("pause", pauseState.pause.name)
             .putLong("elapsed", if (recovered) savedElapsed else 0L).putString("mac", mac).commit())
         fileUtil = file
@@ -181,6 +193,15 @@ class LoggingService : Service(), LocationListener {
             }
         }.onFailure { Timber.w(it, "Trip preview cache will be refreshed later") }
         val ticks = if (recovered) file.inputStream?.let(NativeCsv::read) ?: emptyList() else emptyList()
+        val odometerStart = if (recovered && recordedMac == mac) savedDistanceStart
+            ?: ticks.firstOrNull { it.wheelDataAvailable && it.totalDistance > 0 }?.totalDistance?.toLong() else null
+        val currentOdometer = data?.totalDistance?.takeIf { it > 0 }
+        val sessionStart = currentOdometer?.let { current ->
+            (current - data.distanceFromStart.toLong()).takeIf { it > 0 } ?: current
+        }
+        val distanceStart = odometerStart ?: if (recovered || forceNewDistance) currentOdometer else sessionStart
+        data?.setRecordingDistanceStart(distanceStart)
+        check(preferences.edit().putLong("distance_start", distanceStart ?: -1L).commit())
         csvColumns = if (recovered) file.inputStream?.bufferedReader()?.use { it.readLine()?.trimStart('\uFEFF')?.split(',') }
             ?: NativeCsv.HEADER.split(',') else NativeCsv.HEADER.split(',')
         val points = NativeCsv.points(ticks)
@@ -299,10 +320,11 @@ class LoggingService : Service(), LocationListener {
             check(dayPreferences.edit().clear().putString("file", file.fileName).putString("uri", file.contentUri.toString())
                 .putString("path", file.absolutePath).putLong("start", mutableStatus.value.startedAt)
                 .putLong("elapsed", elapsed)
+                .putLong("distance_start", preferences.getLong("distance_start", -1))
                 .putString("mac", preferences.getString("mac", "GPS"))
                 .putString("day", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())).commit())
         } else if (!continueDay) check(dayPreferences.edit().clear().commit())
-        check(preferences.edit().clear().commit())
+        check(preferences.edit().clear().apply { if (!continueDay) putBoolean("new_distance", true) }.commit())
         mutableStatus.value = TrackStatus()
         broadcast(logging = false, path = file?.absolutePath)
         if (file != null && config.autoUploadEc && config.ecToken != null) {
@@ -374,7 +396,9 @@ class LoggingService : Service(), LocationListener {
                 automaticSuppressed = true
                 // No live writer: only an explicit Stop invalidates the last completed day's file.
                 if (action == STOP) context.getSharedPreferences("native_logging_day", MODE_PRIVATE).edit().clear().commit()
-                context.getSharedPreferences(SESSION, MODE_PRIVATE).edit().clear().commit()
+                context.getSharedPreferences(SESSION, MODE_PRIVATE).edit().clear().apply {
+                    if (action == STOP) putBoolean("new_distance", true)
+                }.commit()
                 mutableStatus.value = TrackStatus()
                 return
             }
