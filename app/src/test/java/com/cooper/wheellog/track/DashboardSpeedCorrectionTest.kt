@@ -62,7 +62,7 @@ class DashboardSpeedCorrectionTest {
             assertTrue(tile("average_riding_speed").startsWith("30.0 "))
             assertTrue(tile("average_speed").startsWith("20.0 "))
 
-            config.speedCorrectionPercent = -6
+            config.speedCorrectionPercent = -6.0
             config.useSpeedCorrection = true
             assertTrue(tile("speed").startsWith("71.7 "))
             assertTrue(tile("top_speed").startsWith("71.7 "))
@@ -71,16 +71,22 @@ class DashboardSpeedCorrectionTest {
             assertEquals(717, ReflectionHelpers.getField<Int>(view, "mSpeed"))
             assertEquals(76.3, wheel.rawSpeedDouble, .00001)
 
-            config.speedCorrectionPercent = 20
-            assertTrue(tile("top_speed").startsWith("91.6 "))
-            assertTrue(tile("average_riding_speed").startsWith("36.0 "))
+            config.speedCorrectionPercent = -6.5
+            assertTrue(tile("speed").startsWith("71.3 "))
+            assertTrue(tile("top_speed").startsWith("71.3 "))
+            assertEquals(28.05, wheel.averageRidingSpeedDouble, .00001)
+            assertEquals(76.3, wheel.rawSpeedDouble, .00001)
+
+            config.speedCorrectionPercent = 10.0
+            assertTrue(tile("top_speed").startsWith("83.9 "))
+            assertTrue(tile("average_riding_speed").startsWith("33.0 "))
             config.useSpeedCorrection = false
             assertTrue(tile("top_speed").startsWith("76.3 "))
             assertTrue(tile("average_riding_speed").startsWith("30.0 "))
             wheel.setRecordingDistanceStart(95_000L)
             adapter.updateScreen(false)
             assertTrue(tile("distance").startsWith("10.00 "))
-            config.speedCorrectionPercent = -6
+            config.speedCorrectionPercent = -6.0
             config.useSpeedCorrection = true
             assertTrue(tile("distance").startsWith("10.00 "))
             assertTrue(tile("average_riding_speed").startsWith("28.2 "))

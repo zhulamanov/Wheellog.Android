@@ -40,17 +40,32 @@ class WheelDataTest: KoinTest {
     fun `Wheel speed correction affects display and maximum while raw telemetry is preserved`() {
         data.speed = 10_000
         data.setTopSpeed(12_000)
-        every { appConfig.appliedSpeedCorrectionPercent } returns -10
+        every { appConfig.appliedSpeedCorrectionPercent } returns -10.0
         assertThat(data.rawSpeedDouble).isEqualTo(100.0)
         assertThat(data.speedDouble).isEqualTo(90.0)
         assertThat(data.speed).isEqualTo(900)
         assertThat(data.topSpeedDouble).isEqualTo(108.0)
         assertThat(data.topSpeed).isEqualTo(10_800)
-        every { appConfig.appliedSpeedCorrectionPercent } returns 20
-        assertThat(data.speedDouble).isEqualTo(120.0)
+        every { appConfig.appliedSpeedCorrectionPercent } returns 10.0
+        assertThat(data.speedDouble).isWithin(.00001).of(110.0)
         assertThat(data.rawSpeedDouble).isEqualTo(100.0)
-        every { appConfig.appliedSpeedCorrectionPercent } returns 0
+        every { appConfig.appliedSpeedCorrectionPercent } returns 0.0
         assertThat(data.speedDouble).isEqualTo(100.0)
+    }
+
+    @Test fun `half percent correction reaches live maximum and captured CSV without integer rounding`() {
+        every { appConfig.appliedSpeedCorrectionPercent } returns -6.5
+        data.speed = 8_160
+        data.setTopSpeed(8_160)
+        assertThat(data.rawSpeedDouble).isEqualTo(81.6)
+        assertThat(data.speedDouble).isWithin(.00001).of(76.296)
+        assertThat(data.topSpeedDouble).isWithin(.00001).of(76.296)
+        val sample = com.cooper.wheellog.data.NativeWheelSample.capture(data, 0, "")
+        val cells = com.cooper.wheellog.data.NativeCsv.HEADER.split(',').zip(
+            com.cooper.wheellog.data.NativeCsv.row(1_700_000_000_000L, null, sample, 0.0, true).split(',')).toMap()
+        assertThat(cells.getValue("speed_correction_percent")).isEqualTo("-6.5")
+        assertThat(cells.getValue("speed").toDouble()).isWithin(.00001).of(76.296)
+        assertThat(cells.getValue("wheel_speed_raw").toDouble()).isEqualTo(81.6)
     }
 
     @Test
@@ -78,7 +93,7 @@ class WheelDataTest: KoinTest {
         assertThat(data.distance).isEqualTo(15_000)
         assertThat(data.getDistanceAtOdometer(104_000)).isEqualTo(14_000)
         assertThat(data.averageRidingSpeedDouble).isEqualTo(30.0)
-        every { appConfig.appliedSpeedCorrectionPercent } returns -6
+        every { appConfig.appliedSpeedCorrectionPercent } returns -6.0
         assertThat(data.distanceDouble).isEqualTo(15.0)
         assertThat(data.averageRidingSpeedDouble).isWithin(.001).of(28.2)
         data.setRecordingDistanceStart(null)
@@ -149,7 +164,7 @@ class WheelDataTest: KoinTest {
     }
 
     @Test fun `minus six percent correction preserves GPS PWM and non speed telemetry in CSV`() {
-        every { appConfig.appliedSpeedCorrectionPercent } returns -6
+        every { appConfig.appliedSpeedCorrectionPercent } returns -6.0
         data.speed = 10_000
         data.voltage = 14_000
         data.current = 1_000

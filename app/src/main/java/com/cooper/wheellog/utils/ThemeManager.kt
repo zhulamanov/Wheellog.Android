@@ -93,6 +93,8 @@ object ThemeManager: KoinComponent {
         original[ThemeIconEnum.SettingsBug] = R.drawable.ic_baseline_bug_report_24
         original[ThemeIconEnum.SettingsAbout] = R.drawable.ic_baseline_info_24
         original[ThemeIconEnum.SettingsVibration] = R.drawable.ic_baseline_vibration_24
+        original[ThemeIconEnum.SettingsVoice] = R.drawable.ic_voice_notifications_24
+        ajdm[ThemeIconEnum.SettingsVoice] = R.drawable.ic_voice_notifications_24
         original[ThemeIconEnum.SettingsWheel] = R.drawable.ic_wheel_white_24
         original[ThemeIconEnum.SettingsTrips] = R.drawable.ic_baseline_explore_24
         original[ThemeIconEnum.SettingsDonate] = R.drawable.ic_donate_24

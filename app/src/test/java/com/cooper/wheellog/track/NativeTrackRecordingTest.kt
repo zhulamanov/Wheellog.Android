@@ -141,7 +141,7 @@ class NativeTrackRecordingTest {
         every { wheel.lastLifeData } answers { System.currentTimeMillis() }
         every { wheel.speedDouble } returns 94.0
         every { wheel.rawSpeedDouble } returns 100.0
-        every { wheel.appliedSpeedCorrectionPercent } returns -6
+        every { wheel.appliedSpeedCorrectionPercent } returns -6.0
         every { wheel.calculatedPwm } returns 73.5
         every { wheel.voltageDouble } returns 140.6
         every { wheel.powerDouble } returns 2000.0
@@ -164,7 +164,7 @@ class NativeTrackRecordingTest {
     @Test fun `real WheelData decode path writes telemetry with minus six percent correction without UI receivers`() {
         config.lastMac = "AA:BB:CC:DD:EE:FF"
         config.useSpeedCorrection = true
-        config.speedCorrectionPercent = -6
+        config.speedCorrectionPercent = -6.0
         val service = start()
         val live = spyk(WheelData())
         val adapter = mockk<com.cooper.wheellog.utils.BaseAdapter>(relaxed = true)
