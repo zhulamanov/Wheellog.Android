@@ -78,12 +78,20 @@ class AppConfig(var context: Context): KoinComponent {
         get() = getValue("speed_correction_enabled_$lastMac", false)
         set(value) = setValue("speed_correction_enabled_$lastMac", value)
 
-    var speedCorrectionPercent: Int
-        get() = getValue("speed_correction_percent_$lastMac", 0).coerceIn(-20, 20)
-        set(value) = setValue("speed_correction_percent_$lastMac", value.coerceIn(-20, 20))
+    // Keep the old integer-percent preference readable; the new key stores half-percent units.
+    var speedCorrectionPercent: Double
+        get() {
+            val key = "speed_correction_half_steps_$lastMac"
+            return if (sharedPreferences.contains(key)) {
+                WheelSpeedCorrection.fromHalfSteps(getValue(key, 0))
+            } else {
+                WheelSpeedCorrection.normalize(getValue("speed_correction_percent_$lastMac", 0).toDouble())
+            }
+        }
+        set(value) = setValue("speed_correction_half_steps_$lastMac", WheelSpeedCorrection.toHalfSteps(value))
 
-    val appliedSpeedCorrectionPercent: Int
-        get() = if (useSpeedCorrection) speedCorrectionPercent else 0
+    val appliedSpeedCorrectionPercent: Double
+        get() = if (useSpeedCorrection) speedCorrectionPercent else 0.0
 
     var customPercents: Boolean
         get() = getValue(R.string.custom_percents, false)

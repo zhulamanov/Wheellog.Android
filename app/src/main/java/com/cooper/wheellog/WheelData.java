@@ -785,7 +785,7 @@ public class WheelData {
 
     public double getRawSpeedDouble() { return mSpeed / 100.0; }
 
-    public int getAppliedSpeedCorrectionPercent() { return appConfig.getAppliedSpeedCorrectionPercent(); }
+    public double getAppliedSpeedCorrectionPercent() { return appConfig.getAppliedSpeedCorrectionPercent(); }
 
     private double speedCorrectionFactor() { return 1.0 + getAppliedSpeedCorrectionPercent() / 100.0; }
 
@@ -1128,6 +1128,7 @@ public class WheelData {
         setMaxTemp(mTemperature);
 
         LoggingService.onWheelDataDecoded(this);
+        com.cooper.wheellog.voice.VoiceAnnouncements.onTelemetry(mContext, this);
 
         Intent intent = new Intent(Constants.ACTION_WHEEL_DATA_AVAILABLE);
 

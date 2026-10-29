@@ -18,7 +18,7 @@ object NativeCsv {
             null, meters.takeIf { gps != null }).map { it?.toString() ?: "" }
         return date + "," + (position + (wheel?.columns ?: List(16) { "" }) + listOf(
             gps?.time?.toString() ?: "", gps?.accuracy?.toString() ?: "", if (segment) "1" else "0",
-            wheel?.rawSpeedKmh?.toString() ?: "", wheel?.correctionPercent?.toString() ?: "",
+            wheel?.rawSpeedKmh?.toString() ?: "", wheel?.correctionPercent?.toString()?.removeSuffix(".0") ?: "",
             recordingElapsedMillis?.toString() ?: ""
         )).joinToString(",") { it.replace(',', ';').replace('\n', ' ').replace('\r', ' ') }
     }
@@ -131,7 +131,7 @@ object NativeCsv {
 }
 
 data class NativeWheelSample(val columns: List<String>, val telemetry: TrackTelemetry,
-                             val rawSpeedKmh: Double? = null, val correctionPercent: Int = 0) {
+                             val rawSpeedKmh: Double? = null, val correctionPercent: Double = 0.0) {
     companion object {
         fun capture(data: WheelData, distance: Int, alert: String) = NativeWheelSample(listOf(data.speedDouble, data.voltageDouble, data.phaseCurrentDouble,
             data.currentDouble, data.powerDouble, data.torque, data.calculatedPwm, data.batteryLevel, distance,

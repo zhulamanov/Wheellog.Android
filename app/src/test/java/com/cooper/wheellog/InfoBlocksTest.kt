@@ -125,24 +125,24 @@ class InfoBlocksTest {
         val config = AppConfig(localized("ru"))
         config.lastMac = "AA:BB:01"
         assertFalse(config.useSpeedCorrection)
-        assertEquals(0, config.speedCorrectionPercent)
-        config.speedCorrectionPercent = -99
+        assertEquals(0.0, config.speedCorrectionPercent, 0.0)
+        config.speedCorrectionPercent = -99.0
         config.useSpeedCorrection = true
-        assertEquals(-20, config.appliedSpeedCorrectionPercent)
-        config.speedCorrectionPercent = -10
+        assertEquals(-10.0, config.appliedSpeedCorrectionPercent, 0.0)
+        config.speedCorrectionPercent = -10.0
         val en = AppConfig(localized("en"))
-        assertEquals(-10, en.appliedSpeedCorrectionPercent)
+        assertEquals(-10.0, en.appliedSpeedCorrectionPercent, 0.0)
         en.lastMac = "AA:BB:02"
-        assertEquals(0, en.speedCorrectionPercent)
+        assertEquals(0.0, en.speedCorrectionPercent, 0.0)
         assertFalse(en.useSpeedCorrection)
-        en.speedCorrectionPercent = 100
+        en.speedCorrectionPercent = 100.0
         en.useSpeedCorrection = true
-        assertEquals(20, en.appliedSpeedCorrectionPercent)
+        assertEquals(10.0, en.appliedSpeedCorrectionPercent, 0.0)
         en.lastMac = "AA:BB:01"
-        assertEquals(-10, en.appliedSpeedCorrectionPercent)
+        assertEquals(-10.0, en.appliedSpeedCorrectionPercent, 0.0)
         en.useSpeedCorrection = false
-        assertEquals(0, en.appliedSpeedCorrectionPercent)
-        assertEquals(-10, en.speedCorrectionPercent)
+        assertEquals(0.0, en.appliedSpeedCorrectionPercent, 0.0)
+        assertEquals(-10.0, en.speedCorrectionPercent, 0.0)
     }
 
     private fun assertEditorGroups(blocks: InfoBlocks, ctx: Context, result: List<String>, active: List<String>) {

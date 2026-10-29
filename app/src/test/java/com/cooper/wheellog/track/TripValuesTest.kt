@@ -33,7 +33,7 @@ class TripValuesTest {
     }
 
     @Test fun `daily GPS and corrected wheel maxima cover all sessions while real recorded stops still count`() {
-        val corrected = wheel(69.372).copy(rawSpeedKmh = 73.8, correctionPercent = -6)
+        val corrected = wheel(69.372).copy(rawSpeedKmh = 73.8, correctionPercent = -6.0)
         val ticks = read(row(0, 21.5f, null), row(1_000, 21.5f, null),
             row(4 * 3_600_000, 19f, corrected, segment = true),
             row(4 * 3_600_000 + 1_000, 19f, corrected),
@@ -106,7 +106,7 @@ class TripValuesTest {
     }
 
     @Test fun `corrected CSV stores raw wheel speed and correction without altering GPS`() {
-        val sample = wheel(90.0).copy(rawSpeedKmh = 100.0, correctionPercent = -10)
+        val sample = wheel(90.0).copy(rawSpeedKmh = 100.0, correctionPercent = -10.0)
         val line = row(0, 25f, sample)
         val cells = NativeCsv.HEADER.split(',').zip(line.split(',')).toMap()
         assertEquals("100.0", cells["wheel_speed_raw"])
@@ -115,4 +115,14 @@ class TripValuesTest {
         assertEquals(90.0, cells.getValue("gps_speed").toDouble(), .001)
         assertEquals(NativeCsv.HEADER.split(',').size, line.split(',').size)
     }
+    @Test fun `fractional correction round trips in CSV while GPS and old metadata stay compatible`() {
+        val sample = wheel(93.5).copy(rawSpeedKmh = 100.0, correctionPercent = -6.5)
+        val line = row(0, 25f, sample)
+        val cells = NativeCsv.HEADER.split(',').zip(line.split(',')).toMap()
+        assertEquals("-6.5", cells["speed_correction_percent"])
+        val values = TripValues.calculate(read(line))
+        assertEquals(93.5, values.wheelMaximum!!, .00001)
+        assertEquals(90.0, values.gpsMaximum!!, .00001)
+    }
+
 }
