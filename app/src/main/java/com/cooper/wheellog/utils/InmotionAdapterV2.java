@@ -20,7 +20,7 @@ public class InmotionAdapterV2 extends BaseAdapter {
     private final AppConfig appConfig = KoinJavaComponent.get(AppConfig.class);
     private static InmotionAdapterV2 INSTANCE;
     private Timer keepAliveTimer;
-    private boolean settingCommandReady = false;
+    private volatile boolean settingCommandReady = false;
     private boolean requestSettings = false;
     private boolean turningOff = false;
     private static int updateStep = 0;
@@ -282,7 +282,7 @@ public class InmotionAdapterV2 extends BaseAdapter {
 
     @Override
     public void switchFlashlight() {
-        if (getModel() == Model.V12HS || getModel() == Model.V12HT || getModel() == Model.V12PRO) {
+        if (hasSeparateBeams()) {
             boolean lowBeam = appConfig.getLowBeamEnabled();
             boolean highBeam = appConfig.getHighBeamEnabled();
             if (lowBeam && highBeam) {
@@ -305,12 +305,15 @@ public class InmotionAdapterV2 extends BaseAdapter {
 
     @Override
     public void setLightState(final boolean lightEnable) {
+        noteManualHeadlight(lightEnable);
         settingCommand = InmotionAdapterV2.Message.setLight(lightEnable).writeBuffer();
         settingCommandReady = true;
     }
 
 
     public void setAutoLight(final boolean autoLightEnable) {
+        // The firmware's own mode is a manual choice from the app.
+        if (autoLightEnable) noteManualHeadlight(true);
         settingCommand = InmotionAdapterV2.Message.setAutoLight(autoLightEnable).writeBuffer();
         settingCommandReady = true;
     }
@@ -323,8 +326,43 @@ public class InmotionAdapterV2 extends BaseAdapter {
 
 
     public void setBeamState(final boolean lowBeamEnable, final boolean highBeamEnable) {
+        noteManualHeadlight(lowBeamEnable || highBeamEnable);
         settingCommand = InmotionAdapterV2.Message.setLightV12(lowBeamEnable, highBeamEnable).writeBuffer();
         settingCommandReady = true;
+    }
+
+    private boolean hasSeparateBeams() {
+        return getModel() == Model.V12HS || getModel() == Model.V12HT || getModel() == Model.V12PRO;
+    }
+
+    @Override
+    public boolean getSupportsAutomaticHeadlight() {
+        return getModel() != Model.UNKNOWN;
+    }
+
+    @Override
+    public boolean getSupportsHeadlightPitch() {
+        // These decoders label the pitch field as uncertain, so do not use it to switch off the lamp.
+        return switch (getModel()) {
+            case V11, V12HS, V12HT, V12PRO -> true;
+            default -> false;
+        };
+    }
+
+    @Override
+    public byte[] automaticHeadlightPacket(boolean on) {
+        if (settingCommandReady || !getSupportsAutomaticHeadlight()) return null;
+        return (hasSeparateBeams() ? Message.setLightV12(on, false) : Message.setLight(on)).writeBuffer();
+    }
+
+    @Override
+    public void rememberAutomaticHeadlight(boolean on) {
+        if (hasSeparateBeams()) {
+            appConfig.setLowBeamEnabled(on);
+            appConfig.setHighBeamEnabled(false);
+        } else {
+            appConfig.setLightEnabled(on);
+        }
     }
 
     @Override

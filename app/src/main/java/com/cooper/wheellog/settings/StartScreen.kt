@@ -83,6 +83,9 @@ fun startScreen(
         clickablePref(name = stringResource(R.string.voice_title), themeIcon = ThemeIconEnum.SettingsVoice) {
             onSelect(SettingsScreenEnum.Voice.name)
         }
+        clickablePref(name = stringResource(R.string.auto_light_title), themeIcon = ThemeIconEnum.SettingsAutoLight) {
+            onSelect(SettingsScreenEnum.AutoLight.name)
+        }
         clickablePref(
             name = stringResource(R.string.watch_settings_title),
             themeIcon = ThemeIconEnum.SettingsWatch,

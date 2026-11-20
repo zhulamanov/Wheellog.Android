@@ -52,6 +52,15 @@ class GotwayAdapterTest: KoinTest {
     }
 
     @Test
+    fun `automatic Begode light is steady and excludes firmware without light settings`() {
+        assertThat(adapter.automaticHeadlightPacket(true)).isEqualTo(byteArrayOf('Q'.code.toByte()))
+        assertThat(adapter.automaticHeadlightPacket(false)).isEqualTo(byteArrayOf('E'.code.toByte()))
+        every { appConfig.IsAlexovikFW } returns true
+        assertThat(adapter.supportsAutomaticHeadlight).isFalse()
+        assertThat(adapter.automaticHeadlightPacket(true)).isNull()
+    }
+
+    @Test
     fun `decode with corrupted data 1-30 units`() {
         // Arrange.
         var byteArray = byteArrayOf()

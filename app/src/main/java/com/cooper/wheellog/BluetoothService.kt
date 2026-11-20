@@ -5,6 +5,10 @@ import android.bluetooth.*
 import android.content.Intent
 import android.os.*
 import android.os.PowerManager.WakeLock
+import com.cooper.wheellog.autolight.AutoLightController
+import com.cooper.wheellog.autolight.AutoLightPreferences
+import com.cooper.wheellog.autolight.AutoLightSample
+import com.cooper.wheellog.autolight.ManualHeadlightCommand
 import com.cooper.wheellog.utils.*
 import com.cooper.wheellog.utils.Constants.WHEEL_TYPE
 import com.cooper.wheellog.utils.SomeUtil.playSound
@@ -18,6 +22,12 @@ import java.util.*
 class BluetoothService: Service() {
     private val appConfig: AppConfig by inject()
     private val notifications: NotificationUtil by inject()
+    private val autoLightPreferences by lazy { AutoLightPreferences(applicationContext) }
+    private val autoLight = AutoLightController()
+    private class AutoLightConnection(val address: String)
+    @Volatile private var autoLightConnection: AutoLightConnection? = null
+    @Volatile private var manualHeadlight: ManualHeadlightCommand? = null
+    private val autoLightHandler = Handler(Looper.getMainLooper())
     private var mDisconnectTime: Date? = null
     private val wheelConnection: BluetoothPeripheral?
         get() = if (wheelAddress.isNotEmpty() && BluetoothAdapter.checkBluetoothAddress(wheelAddress)) {
@@ -60,8 +70,10 @@ class BluetoothService: Service() {
 
             override fun onConnectionFailed(peripheral: BluetoothPeripheral, status: HciStatus) {
                 super.onConnectionFailed(peripheral, status)
-                if (peripheral.address == wheelAddress)
+                if (peripheral.address == wheelAddress) {
+                    resetAutoLightConnection()
                     com.cooper.wheellog.voice.VoiceAnnouncements.onDisconnected(applicationContext, disconnectRequested)
+                }
                 broadcastConnectionUpdate(autoConnect = isWheelSearch, directSearch = true)
                 if (isWheelSearch) {
                     central.autoConnectPeripheral(peripheral, wheelCallback)
@@ -103,8 +115,10 @@ class BluetoothService: Service() {
             ) {
                 super.onDisconnectedPeripheral(peripheral, status)
                 Timber.i("Disconnected from wheel.")
-                if (peripheral.address == wheelAddress)
+                if (peripheral.address == wheelAddress) {
+                    resetAutoLightConnection()
                     com.cooper.wheellog.voice.VoiceAnnouncements.onDisconnected(applicationContext, disconnectRequested)
+                }
                 mDisconnectTime = Calendar.getInstance().time
                 if (!disconnectRequested && wheelAddress.isNotEmpty()) {
                     Timber.i("Trying to reconnect")
@@ -197,8 +211,10 @@ class BluetoothService: Service() {
                 }
                 WheelData.getInstance().isConnected = recognisedWheel
                 if (recognisedWheel) {
-                    if (peripheral.address == wheelAddress && !disconnectRequested && peripheral.state == ConnectionState.CONNECTED)
+                    if (peripheral.address == wheelAddress && !disconnectRequested && peripheral.state == ConnectionState.CONNECTED) {
+                        if (autoLightConnection?.address != peripheral.address) resetAutoLightConnection(peripheral.address)
                         com.cooper.wheellog.voice.VoiceAnnouncements.onConnected(applicationContext, peripheral.address)
+                    }
                     sendBroadcast(Intent(Constants.ACTION_WHEEL_TYPE_RECOGNIZED))
                 } else {
                     Timber.e("Wheel is not recognised")
@@ -235,7 +251,8 @@ class BluetoothService: Service() {
                          characteristic.uuid.toString(), value.size)
 
                 if (status == GattStatus.SUCCESS) {
-                    readData(characteristic, value)
+                    val telemetryAddress = peripheral.address.takeIf { peripheral.state == ConnectionState.CONNECTED }
+                    readData(characteristic, value, telemetryAddress)
                 }
             }
 
@@ -250,7 +267,7 @@ class BluetoothService: Service() {
             }
         }
 
-    private fun readData(characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+    private fun readData(characteristic: BluetoothGattCharacteristic, value: ByteArray, telemetryAddress: String? = null) {
         // RAW data
         if (appConfig.enableRawData) {
             if (fileUtilRawData == null) {
@@ -282,6 +299,8 @@ class BluetoothService: Service() {
             sendBroadcast(serviceIntent)
         }
         val wd = WheelData.getInstance()
+        val speedVersion = wd.speedSampleVersion
+        val angleVersion = wd.angleSampleVersion
         when (wd.wheelType) {
             WHEEL_TYPE.KINGSONG -> if (characteristic.uuid == Constants.KINGSONG_READ_CHARACTER_UUID) {
                 wd.decodeResponse(value, applicationContext)
@@ -313,6 +332,13 @@ class BluetoothService: Service() {
                 }
             }
             else -> {}
+        }
+        val connection = autoLightConnection ?: return
+        if (telemetryAddress == connection.address && telemetryAddress == wheelAddress && !disconnectRequested &&
+            wd.speedSampleVersion != speedVersion && wd.isWheelIsReady) {
+            if ((wd.wheelType == WHEEL_TYPE.GOTWAY || wd.wheelType == WHEEL_TYPE.VETERAN) &&
+                characteristic.uuid != Constants.GOTWAY_READ_CHARACTER_UUID) return
+            updateAutoLight(wd, connection, wd.angle.takeIf { wd.angleSampleVersion != angleVersion })
         }
     }
 
@@ -373,6 +399,7 @@ class BluetoothService: Service() {
     }
 
     override fun onDestroy() {
+        resetAutoLightConnection()
         com.cooper.wheellog.voice.VoiceAnnouncements.detach()
         super.onDestroy()
         fileUtilRawData?.close()
@@ -484,6 +511,63 @@ class BluetoothService: Service() {
         }
         return characteristic
     }
+
+    @Synchronized
+    private fun resetAutoLightConnection(address: String? = null) {
+        autoLightConnection = address?.let(::AutoLightConnection)
+        manualHeadlight = null
+        autoLight.reset()
+    }
+
+    private fun updateAutoLight(wheel: WheelData, connection: AutoLightConnection, pitch: Double?) {
+        val adapter = wheel.adapter ?: return
+        if (!adapter.supportsAutomaticHeadlight) return
+        val options = autoLightPreferences.read(connection.address).forWheel(adapter.supportsHeadlightPitch)
+        val minute = if (options.scheduled) Calendar.getInstance().let {
+            it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE)
+        } else 0
+        val manual = manualHeadlight
+        val motion = AutoLightSample(SystemClock.elapsedRealtime(), minute, wheel.rawSpeedDouble, pitch)
+        autoLight.update(options, motion, manual) {
+            sendAutomaticHeadlight(connection, adapter, manual, it)
+        }
+    }
+
+    @Synchronized
+    internal fun noteManualHeadlight(adapter: BaseAdapter, on: Boolean) {
+        if (autoLightConnection?.address == wheelAddress && WheelData.getInstance().adapter === adapter) {
+            manualHeadlight = ManualHeadlightCommand(on)
+        }
+    }
+
+    @Synchronized
+    private fun sendAutomaticHeadlight(
+        connection: AutoLightConnection,
+        adapter: BaseAdapter,
+        manual: ManualHeadlightCommand?,
+        on: Boolean
+    ): Boolean {
+        if (!isCurrentAutoLightCommand(connection, adapter, manual)) return false
+        val packet = adapter.automaticHeadlightPacket(on) ?: return false
+        if (!writeWheelCharacteristic(packet)) return false
+        if (adapter is GotwayAdapter) {
+            // Begode's light mode uses the same delayed confirmation as its manual button.
+            autoLightHandler.postDelayed({ confirmBegodeHeadlight(connection, adapter, manual) }, 100)
+        }
+        if (appConfig.lastMac.equals(connection.address, ignoreCase = true)) adapter.rememberAutomaticHeadlight(on)
+        return true
+    }
+
+    @Synchronized
+    private fun confirmBegodeHeadlight(connection: AutoLightConnection, adapter: GotwayAdapter, manual: ManualHeadlightCommand?) {
+        if (isCurrentAutoLightCommand(connection, adapter, manual)) {
+            writeWheelCharacteristic(byteArrayOf('b'.code.toByte()))
+        }
+    }
+
+    private fun isCurrentAutoLightCommand(connection: AutoLightConnection, adapter: BaseAdapter, manual: ManualHeadlightCommand?) =
+        connection === autoLightConnection && connection.address == wheelAddress && manual === manualHeadlight &&
+            !disconnectRequested && WheelData.getInstance().adapter === adapter && adapter.supportsAutomaticHeadlight
 
     @Synchronized
     fun writeWheelCharacteristic(cmd: ByteArray?): Boolean {

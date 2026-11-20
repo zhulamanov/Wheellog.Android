@@ -606,6 +606,7 @@ public class GotwayAdapter extends BaseAdapter {
 
     @Override
     public void setLightMode(int lightMode) {
+        noteManualHeadlight(lightMode == lightModeOn || lightMode == lightModeStrobe);
         lock_Changes = 2;
         String command = "";
         switch (lightMode) {
@@ -615,6 +616,24 @@ public class GotwayAdapter extends BaseAdapter {
             case lightModeStrobe: command = "T"; break;
         }
         sendCommand(command);
+    }
+
+    @Override
+    public boolean getSupportsAutomaticHeadlight() {
+        // WheelLog does not expose light-mode settings with Alexovik firmware.
+        return !appConfig.getIsAlexovikFW();
+    }
+
+    @Override
+    public byte[] automaticHeadlightPacket(boolean on) {
+        if (!getSupportsAutomaticHeadlight()) return null;
+        return new byte[]{(byte) (on ? 'Q' : 'E')};
+    }
+
+    @Override
+    public void rememberAutomaticHeadlight(boolean on) {
+        lock_Changes = 2;
+        appConfig.setLightMode(String.valueOf(on ? lightModeOn : lightModeOff));
     }
 
     @Override

@@ -47,6 +47,8 @@ public class WheelData {
     private final SmartBms mSmartBms2 = new SmartBms();
     //all
     private int mSpeed;
+    private int speedSampleVersion;
+    private int angleSampleVersion;
     private double mTorque;
     private double mMotorPower;
     private int mCpuTemp;
@@ -235,7 +237,11 @@ public class WheelData {
 
     public void setSpeed(int speed) {
         mSpeed = speed;
+        speedSampleVersion++;
     }
+
+    public int getSpeedSampleVersion() { return speedSampleVersion; }
+    public int getAngleSampleVersion() { return angleSampleVersion; }
 
     public double getTorque() {
         return mTorque;
@@ -540,6 +546,7 @@ public class WheelData {
 
     public void setAngle(double angle) {
         mAngle = angle;
+        angleSampleVersion++;
     }
 
     public double getRoll() {

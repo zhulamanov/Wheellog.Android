@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="auto_light_title">Auto light</string>
+    <string name="auto_light_description">Turns on the headlight at the set speed using wheel telemetry. Settings are saved for each wheel.</string>
+    <string name="auto_light_connect">Connect a wheel with headlight control to configure Auto light.</string>
+    <string name="auto_light_waiting">Waiting for the wheel to send data.</string>
+    <string name="auto_light_unsupported">Automatic headlight control is unavailable for this wheel or firmware.</string>
+    <string name="auto_light_pitch_unavailable">Reliable pedal angle data is unavailable on this wheel. With OR selected, the light turns off after the stop delay.</string>
+    <string name="auto_light_on_speed">Turn on at this speed</string>
+    <string name="auto_light_auto_off">Turn the headlight off automatically</string>
+    <string name="auto_light_off_description">Only applies when Auto light has turned the headlight on. The wheel must slow down or stop first.</string>
+    <string name="auto_light_off_mode">When to turn the headlight off</string>
+    <string name="auto_light_by_speed">At low speed</string>
+    <string name="auto_light_by_delay_and_pitch">Delay/Pedal angle</string>
+    <string name="auto_light_condition">Condition</string>
+    <string name="auto_light_condition_and">AND</string>
+    <string name="auto_light_condition_or">OR</string>
+    <string name="auto_light_both_need_pitch">This wheel does not send pedal angle data. Select At low speed or use the OR condition for automatic shutoff.</string>
+    <string name="auto_light_off_speed">Turn off at this speed</string>
+    <string name="auto_light_zero_speed">0 km/h</string>
+    <string name="auto_light_off_delay">Delay after stopping</string>
+    <string name="auto_light_off_pitch">Pedal angle in either direction</string>
+    <string name="auto_light_seconds">sec</string>
+    <string name="auto_light_degrees">°</string>
+    <string name="auto_light_schedule">Limit automatic turn-on to certain hours</string>
+    <string name="auto_light_schedule_description">A schedule can cross midnight. The same start and end time allows turn-on all day.</string>
+    <string name="auto_light_start">Start of schedule</string>
+    <string name="auto_light_end">End of schedule</string>
+    <string name="auto_light_manual_description">Manual controls in WheelLog take priority. After a manual turn-off, Auto light waits for a stop before turning the headlight on again.</string>
+</resources>

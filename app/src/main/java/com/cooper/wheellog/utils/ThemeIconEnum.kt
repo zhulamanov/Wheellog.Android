@@ -51,4 +51,5 @@ enum class ThemeIconEnum {
     TripsShare,
     TripsDelete,
     TripsOpenEc,
+    SettingsAutoLight,
 }

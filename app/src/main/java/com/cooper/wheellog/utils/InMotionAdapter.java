@@ -21,7 +21,7 @@ public class InMotionAdapter extends BaseAdapter {
     private Timer keepAliveTimer;
     private int passwordSent = 0;
     private boolean needSlowData = true;
-    protected boolean settingCommandReady = false;
+    protected volatile boolean settingCommandReady = false;
     private static int updateStep = 0;
     protected byte[] settingCommand;
 
@@ -352,8 +352,30 @@ public class InMotionAdapter extends BaseAdapter {
 
     @Override
     public void setLightState(final boolean lightEnable) {
+        noteManualHeadlight(lightEnable);
         settingCommand = InMotionAdapter.CANMessage.setLight(lightEnable).writeBuffer();
         settingCommandReady = true;
+    }
+
+    @Override
+    public boolean getSupportsAutomaticHeadlight() {
+        return true;
+    }
+
+    @Override
+    public boolean getSupportsHeadlightPitch() {
+        return true;
+    }
+
+    @Override
+    public byte[] automaticHeadlightPacket(boolean on) {
+        // Leave the existing manual/settings queue to the adapter's polling loop.
+        return settingCommandReady ? null : CANMessage.setLight(on).writeBuffer();
+    }
+
+    @Override
+    public void rememberAutomaticHeadlight(boolean on) {
+        appConfig.setLightEnabled(on);
     }
 
     @Override

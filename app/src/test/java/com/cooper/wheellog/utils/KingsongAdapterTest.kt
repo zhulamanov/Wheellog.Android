@@ -47,6 +47,18 @@ class KingsongAdapterTest {
     }
 
     @Test
+    fun `automatic light matches the manual KingSong on and off modes`() {
+        val sent = mutableListOf<ByteArray>()
+        every { data.bluetoothCmd(capture(sent)) } returns true
+        adapter.setLightMode(0)
+        adapter.setLightMode(1)
+        adapter.setLightMode(2)
+        assertThat(adapter.automaticHeadlightPacket(true)).isEqualTo(sent[0])
+        assertThat(adapter.automaticHeadlightPacket(false)).isEqualTo(sent[1])
+        assertThat(sent[2][2].toInt()).isEqualTo(0x14)
+    }
+
+    @Test
     fun `decode with corrupted data 1-30 units`() {
         // Arrange.
         var byteArray = byteArrayOf()

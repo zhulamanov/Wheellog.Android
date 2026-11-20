@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="auto_light_title">Автосвет</string>
+    <string name="auto_light_description">Включает фару при заданной скорости по данным колеса. Настройки сохраняются отдельно для каждого колеса.</string>
+    <string name="auto_light_connect">Подключите колесо с управляемой фарой, чтобы настроить «Автосвет».</string>
+    <string name="auto_light_waiting">Ожидание данных от колеса.</string>
+    <string name="auto_light_unsupported">Автоматическое управление фарой для этого колеса или прошивки недоступно.</string>
+    <string name="auto_light_pitch_unavailable">Для этого колеса нет надёжных данных об угле педалей. С условием «ИЛИ» действует задержка после остановки.</string>
+    <string name="auto_light_on_speed">Порог включения</string>
+    <string name="auto_light_auto_off">Автоматически выключать фару</string>
+    <string name="auto_light_off_description">Действует после автоматического включения фары. Сначала колесо должно замедлиться или остановиться.</string>
+    <string name="auto_light_off_mode">Как выключать фару</string>
+    <string name="auto_light_by_speed">По скорости</string>
+    <string name="auto_light_by_delay_and_pitch">Время/Угол педалей</string>
+    <string name="auto_light_condition">Условие</string>
+    <string name="auto_light_condition_and">И</string>
+    <string name="auto_light_condition_or">ИЛИ</string>
+    <string name="auto_light_both_need_pitch">Колесо не передаёт угол педалей. Для автовыключения выберите «По скорости» или условие «ИЛИ».</string>
+    <string name="auto_light_off_speed">Порог выключения</string>
+    <string name="auto_light_zero_speed">0 км/ч</string>
+    <string name="auto_light_off_delay">Задержка после остановки</string>
+    <string name="auto_light_off_pitch">Угол педалей в любую сторону</string>
+    <string name="auto_light_seconds">сек</string>
+    <string name="auto_light_degrees">°</string>
+    <string name="auto_light_schedule">Ограничить автовключение по времени</string>
+    <string name="auto_light_schedule_description">Расписание может переходить через полночь. Если начало и конец совпадают, автовключение доступно круглосуточно.</string>
+    <string name="auto_light_start">Начало</string>
+    <string name="auto_light_end">Конец</string>
+    <string name="auto_light_manual_description">Ручное управление в WheelLog имеет приоритет. После ручного выключения автоматика дождётся остановки и сможет снова включить фару при разгоне.</string>
+</resources>

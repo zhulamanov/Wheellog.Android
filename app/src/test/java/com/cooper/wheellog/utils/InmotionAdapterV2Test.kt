@@ -44,6 +44,23 @@ class InmotionAdapterV2Test: KoinTest {
     }
 
     @Test
+    fun `automatic V12 light enables only low beam and yields to a manual high beam command`() {
+        val modelField = InmotionAdapterV2::class.java.getDeclaredField("mModel").apply { isAccessible = true }
+        val priorModel = modelField.get(null)
+        try {
+            modelField.set(null, InmotionAdapterV2.Model.V12HT)
+            assertThat(adapter.automaticHeadlightPacket(true))
+                .isEqualTo(InmotionAdapterV2.Message.setLightV12(true, false).writeBuffer())
+            assertThat(adapter.automaticHeadlightPacket(false))
+                .isEqualTo(InmotionAdapterV2.Message.setLightV12(false, false).writeBuffer())
+            adapter.setBeamState(true, true)
+            assertThat(adapter.automaticHeadlightPacket(false)).isNull()
+        } finally {
+            modelField.set(null, priorModel)
+        }
+    }
+
+    @Test
     fun `decode with v11 full data`() {
         // Arrange.
         val byteArray1 = "AAAA110882010206010201009C".hexToByteArray() // wheel type

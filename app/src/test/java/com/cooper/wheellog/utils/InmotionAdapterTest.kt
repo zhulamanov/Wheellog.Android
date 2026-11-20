@@ -399,6 +399,17 @@ class InmotionAdapterTest: KoinTest {
     }
 
     @Test
+    fun `automatic headlight uses the older InMotion command and yields to a pending manual setting`() {
+        val expectedOn = "aaaa0d01a5550f010000000000000008050000805555".hexToByteArray()
+        val expectedOff = "aaaa0d01a5550f0000000000000000080500007f5555".hexToByteArray()
+        assertThat(adapter.automaticHeadlightPacket(true)).isEqualTo(expectedOn)
+        assertThat(adapter.automaticHeadlightPacket(false)).isEqualTo(expectedOff)
+        adapter.setLightState(false)
+        assertThat(adapter.automaticHeadlightPacket(true)).isNull()
+        assertThat(adapter.settingCommand).isEqualTo(expectedOff)
+    }
+
+    @Test
     fun `light commands`() {
         // Arrange.
         val expectedOn = "aaaa0d01a5550f010000000000000008050000805555".hexToByteArray()

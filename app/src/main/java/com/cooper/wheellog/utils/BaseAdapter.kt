@@ -1,6 +1,7 @@
 package com.cooper.wheellog.utils
 
 import android.content.Context
+import com.cooper.wheellog.WheelData
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
@@ -9,6 +10,14 @@ abstract class BaseAdapter: KoinComponent {
         get() = get()
 
     abstract fun decode(data: ByteArray?): Boolean
+    open val supportsAutomaticHeadlight: Boolean get() = false
+    open val supportsHeadlightPitch: Boolean get() = false
+    open fun automaticHeadlightPacket(on: Boolean): ByteArray? = null
+    open fun rememberAutomaticHeadlight(on: Boolean) {}
+
+    protected fun noteManualHeadlight(on: Boolean) {
+        WheelData.getInstance()?.bluetoothService?.noteManualHeadlight(this, on)
+    }
     open fun updatePedalsMode(pedalsMode: Int) {}
     open fun setLightMode(lightMode: Int) {}
     open fun setRollAngleMode(rollAngleMode: Int) {}

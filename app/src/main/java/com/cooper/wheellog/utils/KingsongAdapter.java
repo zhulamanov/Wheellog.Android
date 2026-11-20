@@ -456,11 +456,32 @@ public class KingsongAdapter extends BaseAdapter {
 
     @Override
     public void setLightMode(int lightMode) {
+        // Mode 2 hands the headlight to the wheel's own light sensor.
+        noteManualHeadlight(lightMode != 1);
+        WheelData.getInstance().bluetoothCmd(lightModePacket(lightMode));
+    }
+
+    private byte[] lightModePacket(int lightMode) {
         byte[] data = getEmptyRequest();
         data[2] = (byte) (lightMode + 0x12);
         data[3] = (byte) 0x01;
         data[16] = (byte) 0x73;
-        WheelData.getInstance().bluetoothCmd(data);
+        return data;
+    }
+
+    @Override
+    public boolean getSupportsAutomaticHeadlight() {
+        return true;
+    }
+
+    @Override
+    public byte[] automaticHeadlightPacket(boolean on) {
+        return lightModePacket(on ? 0 : 1);
+    }
+
+    @Override
+    public void rememberAutomaticHeadlight(boolean on) {
+        appConfig.setLightMode(on ? "0" : "1");
     }
 
     private boolean is84vWheel() {

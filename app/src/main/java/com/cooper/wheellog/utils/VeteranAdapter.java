@@ -303,13 +303,28 @@ public class VeteranAdapter extends BaseAdapter {
 
     @Override
     public void setLightState(final boolean lightEnable) {
-        String command = "";
-        if (lightEnable) {
-            command = "SetLightON";
-        } else {
-            command = "SetLightOFF";
-        }
-        WheelData.getInstance().bluetoothCmd(command.getBytes());
+        noteManualHeadlight(lightEnable);
+        WheelData.getInstance().bluetoothCmd(automaticHeadlightPacket(lightEnable));
+    }
+
+    @Override
+    public boolean getSupportsAutomaticHeadlight() {
+        return true;
+    }
+
+    @Override
+    public boolean getSupportsHeadlightPitch() {
+        return true;
+    }
+
+    @Override
+    public byte[] automaticHeadlightPacket(boolean on) {
+        return (on ? "SetLightON" : "SetLightOFF").getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    }
+
+    @Override
+    public void rememberAutomaticHeadlight(boolean on) {
+        appConfig.setLightEnabled(on);
     }
 
     @Override
